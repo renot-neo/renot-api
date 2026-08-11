@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/renot-neo/renot-api/compare/v0.2.1...v0.3.0) (2026-08-11)
+
+
+### Features
+
+* add project logo, wire branded favicon, build social preview image ([4a8208e](https://github.com/renot-neo/renot-api/commit/4a8208e5b28fccfa31097c75e64eeb836b04821e))
+
 ## [0.2.1](https://github.com/renot-neo/renot-api/compare/v0.2.0...v0.2.1) (2026-08-11)
 
 
