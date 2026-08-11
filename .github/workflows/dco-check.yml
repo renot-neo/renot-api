@@ -5,12 +5,22 @@ name: DCO Check
 # shell script over `git log`, not a third-party marketplace Action or
 # GitHub App - no third-party code runs here beyond the official
 # actions/checkout.
+#
+# release-please's own release PRs are exempt (branch name always starts
+# with `release-please--branches--`): that commit is created via a
+# personal PAT (RELEASE_PLEASE_TOKEN, deliberately not a bot/App account -
+# see release-please.yml's own comment), so it's authored as the PAT
+# owner, not a `[bot]` identity - the author-email bot-skip below doesn't
+# (and can't) catch it. It never carries a Signed-off-by trailer either.
+# This is an automated maintenance commit, not an external contribution
+# needing provenance verification, so it's exempted by branch name instead.
 
 on:
   pull_request:
 
 jobs:
   dco-check:
+    if: ${{ !startsWith(github.head_ref, 'release-please--branches--') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
