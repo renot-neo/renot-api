@@ -8,14 +8,25 @@ name: CD
 # workflow file.
 #
 # Two triggers, two jobs:
-# - push to `main` -> `build-and-push` (amd64 only, tags `latest`+sha) -
-#   fast, runs on every commit.
+# - push to `main` -> `build-and-push` (amd64 only, tags `edge`+sha) - fast,
+#   runs on every commit. `:edge` is unreleased main HEAD, not something
+#   SECURITY.md's "latest released version" promise covers.
 # - push of a `v*` tag (created by release-please.yml merging its release
 #   PR) -> `build-and-push-tagged` (amd64+arm64 via QEMU/Buildx, tags the
-#   image with the version) - these are the builds the public actually
-#   pulls, so they're worth the multi-arch build's extra time. Regular
-#   main pushes stay amd64-only for fast iteration. See
+#   image with BOTH the version AND `:latest`) - these are the builds the
+#   public actually pulls, so they're worth the multi-arch build's extra
+#   time. Regular main pushes stay amd64-only for fast iteration. See
 #   release-please.yml's own comment for why the tag chain needs a PAT.
+#
+# `:latest` ONLY moves on a release tag (2026-08-12 - previously moved on
+# every main push, which meant "latest" could silently be ahead of, or
+# briefly broken relative to, the latest actual GitHub Release - a real
+# tension with SECURITY.md's "only the latest released version is
+# supported" wording, since pulling `:latest` didn't reliably get you that
+# version). Now `:latest` and `:vX.Y.Z` are always the same digest -
+# standard practice for most Docker images (nginx, postgres, etc.),
+# `:edge` is the bleeding-edge equivalent for anyone who explicitly wants
+# unreleased main.
 #
 # Every published image also gets an SBOM (native buildx feature) and a
 # GitHub Artifact Attestation (Sigstore-based build provenance, verifiable
@@ -32,12 +43,12 @@ env:
 jobs:
   build-and-push:
     if: github.ref_type == 'branch'
-    # Guards the `:latest` tag against a race on two rapid pushes to main:
+    # Guards the `:edge` tag against a race on two rapid pushes to main:
     # without this, an older commit's build could finish after a newer one
-    # and overwrite `:latest` with stale content. Scoped to this job only -
+    # and overwrite `:edge` with stale content. Scoped to this job only -
     # build-and-push-tagged fires once per release, no such race there.
     concurrency:
-      group: cd-main-latest
+      group: cd-main-edge
       cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
@@ -66,7 +77,7 @@ jobs:
           sbom: true
           provenance: true
           tags: |
-            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:edge
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
 
       - uses: actions/attest-build-provenance@v4
@@ -108,6 +119,7 @@ jobs:
           provenance: true
           tags: |
             ${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+            ${{ env.IMAGE_NAME }}:latest
 
       - uses: actions/attest-build-provenance@v4
         with:

@@ -35,5 +35,5 @@ non-security issues.
 
 If your report relates to what data a self-hosted instance stores and how
 sensitive it is (e.g. database compromise scenarios), see
-[docs/DATA_HANDLING.md](docs/DATA_HANDLING.md) for what's stored in plaintext
-vs. hashed, and current mitigation recommendations.
+[docs/DATA_HANDLING.md](docs/DATA_HANDLING.md) for what's stored in
+plaintext, hashed, or encrypted, and current mitigation recommendations.
