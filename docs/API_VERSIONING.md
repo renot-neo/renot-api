@@ -2,7 +2,9 @@
 
 This covers the **HTTP API contract** (`/api/v1/...`) — a distinct thing
 from *software* versioning (git tags, `pyproject.toml`'s `version` field).
-See [README.md](../README.md) for the software-release versioning scheme.
+See [README.md](../README.md) for the software-release versioning scheme,
+and [API_CONVENTIONS.md](API_CONVENTIONS.md) for what the contract looks
+like today (pagination, rate limits, error format, auth).
 
 ## Current status
 
