@@ -32,6 +32,13 @@ env:
 jobs:
   build-and-push:
     if: github.ref_type == 'branch'
+    # Guards the `:latest` tag against a race on two rapid pushes to main:
+    # without this, an older commit's build could finish after a newer one
+    # and overwrite `:latest` with stale content. Scoped to this job only -
+    # build-and-push-tagged fires once per release, no such race there.
+    concurrency:
+      group: cd-main-latest
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
       contents: read

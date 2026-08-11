@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 Ask a question / get support
+    url: https://github.com/renot-neo/renot-api/blob/main/SUPPORT.md
+    about: How to ask for help, and what response-time to expect. Questions go through a blank issue with the `question` label, not a form below.
+  - name: 🔒 Report a security vulnerability
+    url: https://github.com/renot-neo/renot-api/blob/main/SECURITY.md
+    about: Please don't open a public issue for vulnerabilities — see this file for the private disclosure process instead.

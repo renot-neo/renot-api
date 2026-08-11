@@ -23,7 +23,8 @@ communicated via:
 - `Deprecation` and `Sunset` HTTP response headers on the deprecated
   version's responses (once `/api/v2` exists — not implemented today, since
   there is no `/api/v2` yet).
-- A `CHANGELOG.md` entry once release/version tooling is in place.
+- A [`CHANGELOG.md`](../CHANGELOG.md) entry — release-please generates this
+  automatically from Conventional Commits on every release.
 
 ## What counts as breaking vs. non-breaking
 

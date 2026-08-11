@@ -11,7 +11,7 @@
 
 ## Checklist
 
-- [ ] Tests pass locally (`pytest`, `ruff check .`, `mypy app`)
+- [ ] Tests pass locally (`pytest`, `ruff check .`, `black --check .`, `isort --check-only .`, `mypy app`)
 - [ ] Added/updated tests covering this change
 - [ ] Updated relevant docs (README/CONTRIBUTING/etc.) if behavior changed
 - [ ] No private/internal files leaked into this diff
