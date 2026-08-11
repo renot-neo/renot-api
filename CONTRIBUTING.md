@@ -83,6 +83,21 @@ PR flow:
 5. Respond to review feedback — see [SUPPORT.md](SUPPORT.md) for what
    response-time to expect.
 
+## Sign off your commits (DCO)
+
+Every commit must include a `Signed-off-by` trailer, asserting you have
+the right to submit the code under this project's license (MIT) — the
+[Developer Certificate of Origin](https://developercertificate.org/). Add
+it automatically with:
+
+```bash
+git commit -s -m "fix: some bug"
+```
+
+A CI check verifies every commit in a PR has this trailer. If you forgot,
+amend it — `git commit --amend -s` for the last commit, or
+`git rebase --signoff main` for multiple commits — then force-push.
+
 ## Code of Conduct
 
 Participation in this project is governed by the
