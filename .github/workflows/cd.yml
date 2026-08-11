@@ -5,7 +5,7 @@ name: CD
 # responsibility. Deliberately does NOT run Alembic migrations, touch any
 # real database, or deploy anywhere - a real production target needs real
 # credentials, which don't belong in a public, contributor-editable
-# workflow file. See private/PUBLIC_RELEASE_ROADMAP.md section 2.
+# workflow file.
 #
 # Two triggers, two jobs:
 # - push to `main` -> `build-and-push` (amd64 only, tags `latest`+sha) -
@@ -19,8 +19,7 @@ name: CD
 #
 # Every published image also gets an SBOM (native buildx feature) and a
 # GitHub Artifact Attestation (Sigstore-based build provenance, verifiable
-# via `gh attestation verify ghcr.io/renot-neo/renot-api:<tag>`) - see
-# private/PUBLIC_RELEASE_ROADMAP.md section 16.
+# via `gh attestation verify ghcr.io/renot-neo/renot-api:<tag>`).
 
 on:
   push:
@@ -41,6 +40,8 @@ jobs:
       attestations: write
     steps:
       - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
 
       - uses: docker/login-action@v4
         with:

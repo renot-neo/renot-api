@@ -2,8 +2,7 @@ name: release-please
 
 # Maintains a standing "release PR" (draft CHANGELOG.md + version bump)
 # that sits for manual review - merging THAT PR is what cuts the actual
-# git tag and triggers cd.yml's tag-triggered build. See
-# private/PUBLIC_RELEASE_ROADMAP.md section 4.
+# git tag and triggers cd.yml's tag-triggered build.
 #
 # IMPORTANT - uses a PAT, not the default GITHUB_TOKEN: resources (tags,
 # PRs) created via the default GITHUB_TOKEN do NOT trigger other GitHub
@@ -31,5 +30,4 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v5
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-          release-type: python
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}

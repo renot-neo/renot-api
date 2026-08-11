@@ -5,7 +5,7 @@ name: PR Title Lint
 # only "Squash and merge" is the intended merge method on `main` (a GitHub
 # Settings choice, configured separately, not by this file), so the PR
 # title becomes the actual commit on `main` that release-please's
-# changelog reads. See private/PUBLIC_RELEASE_ROADMAP.md section 4.
+# changelog reads.
 
 on:
   pull_request:
