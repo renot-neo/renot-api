@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/renot-neo/renot-api/compare/v0.2.0...v0.2.1) (2026-08-11)
+
+
+### Bug Fixes
+
+* exempt release-please's own release PR from the DCO check ([7852dc8](https://github.com/renot-neo/renot-api/commit/7852dc8ce3a562c4bea897f0201d33977a9c09a2))
+
 ## [0.2.0](https://github.com/renot-neo/renot-api/compare/v0.1.0...v0.2.0) (2026-08-11)
 
 
