@@ -40,6 +40,11 @@ router = APIRouter(prefix="/webhooks", tags=["webhooks"])
     "`X-Telegram-Bot-Api-Secret-Token` header, NOT a JWT. Handles the "
     "built-in `/start`/`/stop`/`/status`/`/help` commands; other updates "
     "are accepted & ignored (still 200 OK), per this MVP's scope.",
+    # Hidden from the public OpenAPI schema/docs UI - Telegram calls this,
+    # not a customer, so it shouldn't appear as something a customer should
+    # call directly. Functionally unchanged: the route still works exactly
+    # the same, it just stops appearing in /docs.
+    include_in_schema=False,
 )
 async def receive_telegram_update(
     bot_id: uuid.UUID,

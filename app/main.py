@@ -57,11 +57,16 @@ def configure_logging() -> None:
 def create_app() -> FastAPI:
     configure_logging()
 
+    # Interactive docs UI is disabled in production to reduce reconnaissance
+    # surface (the full endpoint/schema map isn't handed to anyone who visits
+    # a production URL). `openapi_url` stays enabled in every environment -
+    # only the browsable /docs and /redoc UIs are gated.
+    docs_enabled = settings.environment != "production"
     app = FastAPI(
         title=settings.app_name,
         version="0.1.0",
-        docs_url="/docs",
-        redoc_url="/redoc",
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
         openapi_url=f"{API_V1_PREFIX}/openapi.json",
     )
 
