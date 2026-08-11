@@ -1,0 +1,131 @@
+# Dev compose: app, postgres, redis, celery worker, celery beat.
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: runtime
+    env_file:
+      - ../.env.development
+    # Same reasoning as celery-worker/celery-beat/celery-flower below:
+    # `.env.development`'s DATABASE__URL/REDIS__URL/CELERY__BROKER_URL point
+    # at `localhost`, correct for a host process but not for this
+    # container - override to the Docker network service names here, not
+    # in `.env.development` itself. CELERY__BROKER_URL matters here too
+    # (even though this is the FastAPI process, not a worker) - any
+    # endpoint that calls `.delay()` (messaging send, webhook inbound,
+    # billing metering) publishes to the broker directly from this
+    # container.
+    environment:
+      DATABASE__URL: postgresql+asyncpg://renot:renot@postgres:5432/renot_dev
+      REDIS__URL: redis://redis:6379/0
+      CELERY__BROKER_URL: redis://redis:6379/1
+      CELERY__RESULT_BACKEND: redis://redis:6379/2
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ../app:/app/app
+
+  celery-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: runtime
+    # `-Q` must be explicit: task_routes (core/celery_app.py) route tasks
+    # to queues other than `default` (messaging.send/scheduled,
+    # webhooks.outbound, billing.metering) - without this the worker only
+    # consumes `default` and every other task piles up in Redis, never processed.
+    command: celery -A app.worker worker --loglevel=info -Q default,messaging.send,messaging.scheduled,webhooks.outbound,billing.metering
+    env_file:
+      - ../.env.development
+    # Same reasoning as celery-flower below: `.env.development`'s
+    # CELERY__BROKER_URL/RESULT_BACKEND/DATABASE__URL/REDIS__URL all point
+    # at `localhost`, correct for a host process but not for this
+    # container - override to the Docker network service names here, not
+    # in `.env.development` itself. DATABASE__URL/REDIS__URL matter here
+    # (unlike celery-beat) because actual task execution
+    # (`worker_engine`/`WorkerAsyncSessionFactory` in core/database.py,
+    # the throttle client in messaging/tasks.py) uses those, not just the
+    # broker/result-backend connection.
+    environment:
+      CELERY__BROKER_URL: redis://redis:6379/1
+      CELERY__RESULT_BACKEND: redis://redis:6379/2
+      DATABASE__URL: postgresql+asyncpg://renot:renot@postgres:5432/renot_dev
+      REDIS__URL: redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+
+  celery-beat:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: runtime
+    command: celery -A app.worker beat --loglevel=info
+    env_file:
+      - ../.env.development
+    # Same reasoning as celery-worker/celery-flower - override for the
+    # container network, not `.env.development` itself.
+    environment:
+      CELERY__BROKER_URL: redis://redis:6379/1
+      CELERY__RESULT_BACKEND: redis://redis:6379/2
+    depends_on:
+      - postgres
+      - redis
+
+  # Monitoring UI for celery-worker/celery-beat (task detail, retry/queue
+  # state, revoke). **Dev-only** - this compose file is only meant for dev.
+  # If/when a staging compose is ever created: add `--basic_auth=user:pass`
+  # to the command below (credentials from a secret manager, NEVER
+  # hardcoded). Production must NEVER run this service at all.
+  celery-flower:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: runtime-dev
+    command: celery -A app.worker flower --port=5555
+    env_file:
+      - ../.env.development
+    # `.env.development`'s CELERY__BROKER_URL/RESULT_BACKEND point at
+    # `localhost` - correct for a host process (app/worker are usually run
+    # directly on the host, not as a container) connecting to Redis via the
+    # `6379:6379` port this compose forwards. But celery-flower runs AS a
+    # container, so it must use the Docker network service name (`redis`)
+    # instead of `localhost` - overridden here rather than changing
+    # `.env.development` itself (so the host process stays unaffected).
+    environment:
+      CELERY__BROKER_URL: redis://redis:6379/1
+      CELERY__RESULT_BACKEND: redis://redis:6379/2
+      # Flower's own REST API 401s by default even with no basic_auth set,
+      # unless this is explicitly acknowledged - without it the dashboard's
+      # own JS calls (which hit this same API) can't populate worker/task
+      # data either, defeating the "no auth in dev" choice. Consistent with
+      # that same choice - do NOT carry this into a future staging/production
+      # config where --basic_auth is added.
+      FLOWER_UNAUTHENTICATED_API: "true"
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: renot
+      POSTGRES_PASSWORD: renot
+      POSTGRES_DB: renot_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:

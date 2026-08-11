@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env*
+!.env.example
+
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+.DS_Store
+
+.claude/settings.local.json
+
+# Private strategy/planning docs - never meant to reach the public repo.
+private/
