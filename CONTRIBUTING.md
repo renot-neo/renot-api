@@ -64,9 +64,14 @@ pre-commit install
 
 ## Commit messages & PRs
 
-Keep commit messages short and in the imperative ("add X", "fix Y") — no
-required format is enforced yet. (This may become stricter later; nothing
-you need to do differently today.)
+Individual commits inside a PR can stay free-form — keep them short and in
+the imperative ("add X", "fix Y"). **PR titles**, however, must follow
+[Conventional Commits](https://www.conventionalcommits.org/) format
+(`feat: ...`, `fix: ...`, `chore: ...`, `docs: ...`, etc.) — a CI check
+(`pr-title-lint.yml`) enforces this on every PR, and only "Squash and
+merge" is the intended merge method on `main` (a GitHub Settings choice,
+configured separately), so the PR title becomes the actual commit message
+on `main` that release-please's changelog reads.
 
 PR flow:
 

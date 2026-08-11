@@ -1,0 +1,23 @@
+name: PR Title Lint
+
+# PR *titles* must follow Conventional Commits format - individual commits
+# inside a PR stay free-form (see CONTRIBUTING.md). This matters because
+# only "Squash and merge" is the intended merge method on `main` (a GitHub
+# Settings choice, configured separately, not by this file), so the PR
+# title becomes the actual commit on `main` that release-please's
+# changelog reads. See private/PUBLIC_RELEASE_ROADMAP.md section 4.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  lint-pr-title:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
