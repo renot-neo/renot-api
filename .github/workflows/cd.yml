@@ -11,9 +11,11 @@ name: CD
 # - push to `main` -> `build-and-push` (amd64 only, tags `latest`+sha) -
 #   fast, runs on every commit.
 # - push of a `v*` tag (created by release-please.yml merging its release
-#   PR) -> `build-and-push-tagged` (tags the image with the version) -
-#   these are the builds the public actually pulls. See
-#   release-please.yml's own comment for why that chain needs a PAT.
+#   PR) -> `build-and-push-tagged` (amd64+arm64 via QEMU/Buildx, tags the
+#   image with the version) - these are the builds the public actually
+#   pulls, so they're worth the multi-arch build's extra time. Regular
+#   main pushes stay amd64-only for fast iteration. See
+#   release-please.yml's own comment for why the tag chain needs a PAT.
 #
 # Every published image also gets an SBOM (native buildx feature) and a
 # GitHub Artifact Attestation (Sigstore-based build provenance, verifiable
@@ -76,6 +78,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - uses: docker/setup-qemu-action@v4
+
+      - uses: docker/setup-buildx-action@v4
+
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -88,6 +94,7 @@ jobs:
           context: .
           file: docker/Dockerfile
           target: runtime
+          platforms: linux/amd64,linux/arm64
           push: true
           sbom: true
           provenance: true
