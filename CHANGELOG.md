@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/renot-neo/renot-api/compare/v0.3.0...v0.4.0) (2026-08-11)
+
+
+### Features
+
+* encrypt Bot.token and Bot.webhook_secret at rest ([55d62b1](https://github.com/renot-neo/renot-api/commit/55d62b1a70f8917c1088731310108cf3f87c6da7))
+
+
+### Documentation
+
+* update DATA_HANDLING.md - Bot.token/webhook_secret now encrypted ([a2ae280](https://github.com/renot-neo/renot-api/commit/a2ae280ad08fa5deb0fa471903c70595e14e9a7e))
+
 ## [0.3.0](https://github.com/renot-neo/renot-api/compare/v0.2.1...v0.3.0) (2026-08-11)
 
 
