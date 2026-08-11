@@ -1,0 +1,35 @@
+name: release-please
+
+# Maintains a standing "release PR" (draft CHANGELOG.md + version bump)
+# that sits for manual review - merging THAT PR is what cuts the actual
+# git tag and triggers cd.yml's tag-triggered build. See
+# private/PUBLIC_RELEASE_ROADMAP.md section 4.
+#
+# IMPORTANT - uses a PAT, not the default GITHUB_TOKEN: resources (tags,
+# PRs) created via the default GITHUB_TOKEN do NOT trigger other GitHub
+# Actions workflows (GitHub's anti-recursion measure). Without this, the
+# tag this creates would never trigger cd.yml's `build-and-push-tagged`
+# job. Before relying on that chain, create a fine-grained Personal Access
+# Token scoped to this repo only, with Contents:write and Pull
+# requests:write permissions, and add it as a repository secret named
+# RELEASE_PLEASE_TOKEN (Settings -> Secrets and variables -> Actions).
+# This is a manual, one-time GitHub Settings step - not something any
+# commit in this repo can do.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          release-type: python
