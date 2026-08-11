@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/renot-neo/renot-api/compare/v0.4.0...v0.4.1) (2026-08-11)
+
+
+### Bug Fixes
+
+* :latest GHCR tag now only moves on a release, not every main push ([f0abfbc](https://github.com/renot-neo/renot-api/commit/f0abfbc527d59b4208b0b8abc8e9e1a7ef1ef839))
+
 ## [0.4.0](https://github.com/renot-neo/renot-api/compare/v0.3.0...v0.4.0) (2026-08-11)
 
 
