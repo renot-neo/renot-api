@@ -1,6 +1,6 @@
 # RENOT API
 
-[![CI](https://github.com/<your-org>/renot-api/actions/workflows/ci.yml/badge.svg)](https://github.com/<your-org>/renot-api/actions/workflows/ci.yml)
+[![CI](https://github.com/renot-neo/renot-api/actions/workflows/ci.yml/badge.svg)](https://github.com/renot-neo/renot-api/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > **Status:** Pre-1.0 (`0.x`), following [SemVer](https://semver.org/) —
