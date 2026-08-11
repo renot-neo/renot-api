@@ -2,7 +2,7 @@
 # Multi-stage build: the builder stage installs & compiles dependencies,
 # the runtime stage is a minimal/slim image.
 
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /build
 
@@ -24,7 +24,7 @@ COPY requirements-dev.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements-dev.txt
 
 
-FROM python:3.12-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -52,7 +52,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 # The dev-tooling image (celery-flower) - same as "runtime" but built from
 # `builder-dev` (which has requirements-dev.txt, including `flower`). No
 # default CMD - docker-compose determines the command per service.
-FROM python:3.12-slim AS runtime-dev
+FROM python:3.14-slim AS runtime-dev
 
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
