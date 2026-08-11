@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import logging
 import sys
+import tomllib
+from pathlib import Path
 
 import structlog
 from fastapi import FastAPI
@@ -30,6 +32,25 @@ from app.modules.organizations.router import router as organizations_router
 from app.modules.webhooks.router import router as webhooks_router
 
 API_V1_PREFIX = "/api/v1"
+
+_PYPROJECT_PATH = Path(__file__).resolve().parent.parent / "pyproject.toml"
+
+
+def _read_app_version(pyproject_path: Path) -> str:
+    """Read `[project].version` from `pyproject.toml` at runtime, so this
+
+    stays in sync with the version release-please bumps automatically
+    (`release-type: python`) instead of drifting from a separate hardcoded
+    string. Falls back to `"0.0.0"` if the file is missing/malformed rather
+    than crashing app startup - a wrong-but-present version string is
+    better than a broken deployment.
+    """
+    try:
+        with pyproject_path.open("rb") as f:
+            data = tomllib.load(f)
+        return data["project"]["version"]
+    except (FileNotFoundError, KeyError, tomllib.TOMLDecodeError):
+        return "0.0.0"
 
 
 def configure_logging() -> None:
@@ -65,7 +86,7 @@ def create_app() -> FastAPI:
     docs_enabled = settings.environment != "production"
     app = FastAPI(
         title=settings.app_name,
-        version="0.1.0",
+        version=_read_app_version(_PYPROJECT_PATH),
         docs_url="/docs" if docs_enabled else None,
         redoc_url="/redoc" if docs_enabled else None,
         openapi_url=f"{API_V1_PREFIX}/openapi.json",
