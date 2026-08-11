@@ -13,6 +13,9 @@ from pathlib import Path
 
 import structlog
 from fastapi import FastAPI
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
@@ -34,6 +37,8 @@ from app.modules.webhooks.router import router as webhooks_router
 API_V1_PREFIX = "/api/v1"
 
 _PYPROJECT_PATH = Path(__file__).resolve().parent.parent / "pyproject.toml"
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
+_FAVICON_URL = "/static/favicon.ico"
 
 
 def _read_app_version(pyproject_path: Path) -> str:
@@ -84,11 +89,17 @@ def create_app() -> FastAPI:
     # in every environment by design, so `/api/v1/openapi.json` is still
     # reachable directly.
     docs_enabled = settings.environment != "production"
+    # docs_url/redoc_url stay None unconditionally here, even when
+    # docs_enabled - FastAPI's own built-in /docs and /redoc routes (added
+    # automatically by this constructor whenever these are non-None) always
+    # point at FastAPI's own hardcoded favicon with no override hook, so
+    # branding this app's docs UI (below) requires suppressing them and
+    # registering fully custom routes at the same paths instead.
     app = FastAPI(
         title=settings.app_name,
         version=_read_app_version(_PYPROJECT_PATH),
-        docs_url="/docs" if docs_enabled else None,
-        redoc_url="/redoc" if docs_enabled else None,
+        docs_url=None,
+        redoc_url=None,
         openapi_url=f"{API_V1_PREFIX}/openapi.json",
     )
 
@@ -119,6 +130,45 @@ def create_app() -> FastAPI:
     app.include_router(messaging_router, prefix=API_V1_PREFIX)
     app.include_router(message_templates_router, prefix=API_V1_PREFIX)
     app.include_router(billing_router, prefix=API_V1_PREFIX)
+
+    # Static assets (currently just the favicon) - mounted unconditionally,
+    # in every environment. Serving one small icon file isn't part of the
+    # docs-UI discovery concern the docs_enabled gate above exists for.
+    app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def favicon() -> FileResponse:
+        """Conventional root-level favicon browsers request automatically
+
+        for any page (e.g. /healthz opened directly) - separate from the
+        /docs and /redoc pages below, which reference `_FAVICON_URL`
+        explicitly rather than relying on this route.
+        """
+        return FileResponse(_STATIC_DIR / "favicon.ico")
+
+    if docs_enabled:
+
+        @app.get("/docs", include_in_schema=False)
+        async def swagger_ui_html() -> HTMLResponse:
+            return get_swagger_ui_html(
+                # `app.openapi_url` is typed `str | None` (FastAPI allows
+                # disabling the schema entirely) even though this app always
+                # passes a concrete value above - use that same literal
+                # directly rather than reading the attribute back, so mypy
+                # doesn't need a redundant None-check for a case that can't
+                # happen here.
+                openapi_url=f"{API_V1_PREFIX}/openapi.json",
+                title=f"{app.title} - Swagger UI",
+                swagger_favicon_url=_FAVICON_URL,
+            )
+
+        @app.get("/redoc", include_in_schema=False)
+        async def redoc_html() -> HTMLResponse:
+            return get_redoc_html(
+                openapi_url=f"{API_V1_PREFIX}/openapi.json",  # see swagger_ui_html above
+                title=f"{app.title} - ReDoc",
+                redoc_favicon_url=_FAVICON_URL,
+            )
 
     @app.get("/healthz", tags=["health"], summary="Liveness check")
     async def healthz() -> dict:

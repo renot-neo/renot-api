@@ -1,4 +1,9 @@
-# RENOT API
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo/lockup-dark.png">
+    <img alt="renot-api" src="docs/assets/logo/lockup-light.png" height="72">
+  </picture>
+</p>
 
 [![CI](https://github.com/renot-neo/renot-api/actions/workflows/ci.yml/badge.svg)](https://github.com/renot-neo/renot-api/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
