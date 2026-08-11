@@ -70,9 +70,7 @@ async def test_subscribe_plan_happy_path_and_not_found(
     client_as_owner: AsyncClient, db_session: AsyncSession
 ) -> None:
     plans_resp = await client_as_owner.get("/api/v1/billing/plans")
-    default_plan_id = next(
-        p["id"] for p in plans_resp.json()["data"]["items"] if p["is_default"]
-    )
+    default_plan_id = next(p["id"] for p in plans_resp.json()["data"]["items"] if p["is_default"])
 
     ok_resp = await client_as_owner.post(
         "/api/v1/billing/subscribe-plan", json={"plan_id": default_plan_id}

@@ -13,14 +13,17 @@ service, a Privacy Policy/ToS would be a separate, business-owned document.
 | `User.password_hash` | Hashed | No auto-purge (active account data) |
 | `Bot.api_key_hash` | Hashed | No auto-purge (active resource) |
 | `Bot.token` (the real Telegram bot token) | 🔴 **Plaintext** — no encryption module exists in `app/` today | Kept as long as the bot exists |
+| `Bot.webhook_secret` (validated against the `X-Telegram-Bot-Api-Secret-Token` header on inbound webhooks) | 🔴 **Plaintext** — no encryption module exists in `app/` today | Kept as long as the bot exists |
+| `RefreshToken.token_hash` | Hashed | Kept until revoked/expired (not auto-purged) |
+| `User.email` / `User.full_name` | Plaintext PII | No auto-purge (active account data) |
 | `Destination.chat_id` / `Destination.title` (Telegram chat/group/channel identifiers) | Plaintext | No auto-purge |
 | `Message` / `MessageTemplate` content (actual message text/media/poll data) | Plaintext, soft-delete only | 🔴 Not covered by the automated retention purge below — content persists indefinitely (soft-deleted, recoverable) |
 | `DeliveryLog`, `UsageEvent` | Plaintext | Auto-purged per organization's `Plan.retention_days` (daily job, see below) |
 
-**`Bot.token` is stored in plaintext.** This is a known, currently accepted
-gap — encrypting it at rest is tracked as a future security improvement, not
-implemented today. Stated here plainly so self-hosters can make an informed
-decision, not glossed over.
+**`Bot.token` and `Bot.webhook_secret` are stored in plaintext.** This is a
+known, currently accepted gap — encrypting them at rest is tracked as a
+future security improvement, not implemented today. Stated here plainly so
+self-hosters can make an informed decision, not glossed over.
 
 ## Automated retention purge
 
@@ -39,7 +42,8 @@ the *only* automated data deletion in the system — it does not touch
 - **Encrypt disks at rest** for whatever host runs Postgres.
 - **Rotate a bot's Telegram token** (via `@BotFather`) if you ever suspect
   the database has been compromised — treat any DB exposure as a token
-  leak.
+  leak. Rotate each bot's `webhook_secret` too (re-register the webhook),
+  since it's stored plaintext alongside the token.
 - **Restrict Redis access** the same way — it holds Celery broker/result
   state and rate-limit counters; not a durable store, but still
   operationally sensitive while a request is in flight.

@@ -25,13 +25,28 @@ curl -X POST https://your-domain.example.com/api/v1/messages \
 ```json
 {
   "success": true,
-  "data": { "message_id": "f4e2c1a0-1234-4a5b-8c9d-abcdef123456", "status": "queued" },
+  "data": {
+    "id": "f4e2c1a0-1234-4a5b-8c9d-abcdef123456",
+    "tenant_id": "a1b2c3d4-1234-4a5b-8c9d-abcdef123456",
+    "bot_id": "b3f1c2a0-1234-4a5b-8c9d-abcdef123456",
+    "template_id": null,
+    "content_type": "text",
+    "text": "Deployment finished ✅",
+    "parse_mode": null,
+    "media_type": null,
+    "media_url": null,
+    "inline_keyboard": null,
+    "poll": null,
+    "scheduled_at": null,
+    "dispatched_at": null,
+    "created_at": "2026-08-11T10:00:00+00:00"
+  },
   "meta": { "request_id": "...", "timestamp": "..." },
   "error": null
 }
 ```
 
-See [docs/API_CONVENTIONS.md](docs/API_CONVENTIONS.md) for the full request/response shape, auth, and rate limits.
+See [docs/API_CONVENTIONS.md](docs/API_CONVENTIONS.md) for pagination, rate limits, the response envelope, and auth conventions — see the interactive docs (`/docs`, disabled in production) for full per-endpoint request/response schemas.
 
 ## Tech stack
 
@@ -128,7 +143,9 @@ alembic revision --autogenerate -m "description"
 
 Once running locally, interactive API docs are available at
 `http://localhost:8000/docs` (Swagger UI) and `http://localhost:8000/redoc`
-(ReDoc). These are automatically disabled in production — see
+(ReDoc). The browsable UIs are automatically disabled in production — the
+underlying OpenAPI schema (`/api/v1/openapi.json`) is not, and stays
+reachable in every environment by design. See
 [docs/API_CONVENTIONS.md](docs/API_CONVENTIONS.md) for the API reference
 that stays available regardless of environment.
 
