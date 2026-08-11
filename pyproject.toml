@@ -1,6 +1,6 @@
 [project]
 name = "renot-api"
-version = "0.3.0"
+version = "0.4.0"
 description = "A multi-tenant B2B SaaS platform for centralized Telegram bot management."
 requires-python = ">=3.12"
 
