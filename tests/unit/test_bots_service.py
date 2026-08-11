@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.core.pagination import Page, PageParams
+from app.core.security import decrypt_secret, encrypt_secret
 from app.modules.bots import service
 from app.modules.bots.exceptions import (
     BotAlreadyRegisteredError,
@@ -32,14 +33,20 @@ _ME_RESULT = {"id": 123456789, "is_bot": True, "username": "mybot", "first_name"
 
 
 def _bot(**overrides: object) -> Bot:
+    # `token_encrypted`/`webhook_secret_encrypted` default to genuinely
+    # Fernet-encrypted values (not arbitrary strings) so any test calling
+    # `get_bot_token`/`get_bot_webhook_secret`/`reveal_token`/
+    # `reveal_webhook_secret` against a default-built bot succeeds without
+    # needing a per-test override.
     defaults: dict[str, object] = {
         "id": uuid.uuid4(),
         "tenant_id": uuid.uuid4(),
         "name": "My Bot",
         "telegram_bot_id": 123456789,
         "username": "mybot",
-        "token": "123456:dummy-token",
-        "webhook_secret": "secret",
+        "token_encrypted": encrypt_secret("123456:dummy-token"),
+        "token_last_four": "oken",
+        "webhook_secret_encrypted": encrypt_secret("secret"),
         "webhook_enabled": False,
         "api_key_hash": "hash",
         "api_key_prefix": "tgbm_live_abcd",
@@ -61,10 +68,18 @@ def _assignment(**overrides: object) -> BotAssignment:
     return BotAssignment(**defaults)  # type: ignore[arg-type]
 
 
-def test_bot_token_last_four_derived_from_token() -> None:
-    bot = _bot(token="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11")
-    assert bot.token_last_four == "ew11"
-    assert bot.token_last_four == bot.token[-4:]
+def test_bot_token_encrypted_is_not_the_plaintext_token() -> None:
+    """`token_encrypted` must never equal (or contain) the real plaintext -
+
+    that's the whole point of the column rename from `token`. See
+    `private/specs/2026-08-12-bot-secret-encryption-design.md`.
+    """
+    plaintext = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+    bot = _bot(token_encrypted=encrypt_secret(plaintext))
+
+    assert bot.token_encrypted != plaintext
+    assert plaintext not in bot.token_encrypted
+    assert decrypt_secret(bot.token_encrypted) == plaintext
 
 
 @pytest.mark.asyncio
@@ -88,7 +103,15 @@ async def test_register_bot_success_calls_get_me_and_set_webhook() -> None:
         create_kwargs = repo.create.call_args.kwargs
         assert create_kwargs["telegram_bot_id"] == 123456789
         assert create_kwargs["username"] == "mybot"
-        assert create_kwargs["token"] == "123456:dummy-token"
+        # Encrypted, not plaintext - and it must decrypt back correctly.
+        assert create_kwargs["token_encrypted"] != "123456:dummy-token"
+        assert decrypt_secret(create_kwargs["token_encrypted"]) == "123456:dummy-token"
+        assert create_kwargs["token_last_four"] == "oken"
+        assert create_kwargs["webhook_secret_encrypted"] != set_wh.await_args.kwargs["secret_token"]
+        assert (
+            decrypt_secret(create_kwargs["webhook_secret_encrypted"])
+            == set_wh.await_args.kwargs["secret_token"]
+        )
         set_wh.assert_awaited_once()
         assert set_wh.await_args.kwargs["url"].endswith(f"/api/v1/webhooks/telegram/{bot.id}")
 
@@ -247,14 +270,39 @@ async def test_delete_bot_calls_soft_delete() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_bot_token_returns_stored_token() -> None:
-    existing = _bot(token="123456:real-token")
+async def test_get_bot_token_returns_decrypted_token() -> None:
+    existing = _bot(token_encrypted=encrypt_secret("123456:real-token"))
     with patch("app.modules.bots.service.BotRepository") as repo_cls:
         repo_cls.return_value.get_active = AsyncMock(return_value=existing)
 
         token = await service.get_bot_token(AsyncMock(), tenant_id=uuid.uuid4(), bot_id=existing.id)
 
         assert token == "123456:real-token"
+
+
+@pytest.mark.asyncio
+async def test_get_bot_webhook_secret_returns_decrypted_secret() -> None:
+    existing = _bot(webhook_secret_encrypted=encrypt_secret("real-webhook-secret"))
+    with patch("app.modules.bots.service.BotRepository") as repo_cls:
+        repo_cls.return_value.get_active = AsyncMock(return_value=existing)
+
+        secret = await service.get_bot_webhook_secret(
+            AsyncMock(), tenant_id=uuid.uuid4(), bot_id=existing.id
+        )
+
+        assert secret == "real-webhook-secret"
+
+
+def test_reveal_token_decrypts_an_already_loaded_bot() -> None:
+    bot = _bot(token_encrypted=encrypt_secret("123456:already-loaded"))
+
+    assert service.reveal_token(bot) == "123456:already-loaded"
+
+
+def test_reveal_webhook_secret_decrypts_an_already_loaded_bot() -> None:
+    bot = _bot(webhook_secret_encrypted=encrypt_secret("already-loaded-secret"))
+
+    assert service.reveal_webhook_secret(bot) == "already-loaded-secret"
 
 
 @pytest.mark.asyncio

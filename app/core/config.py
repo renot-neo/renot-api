@@ -44,6 +44,14 @@ class TelegramSettings(BaseModel):
     webhook_base_url: str = "https://your-domain.example.com"
     # Tutorial link sent back by the bot's `/help` command.
     help_url: str = "https://your-domain.example.com/docs/telegram-bot-setup"
+    # Fernet key encrypting `Bot.token`/`Bot.webhook_secret` at rest (see
+    # `core/security.encrypt_secret`/`decrypt_secret`). Unlike JWT_SECRET_KEY
+    # above, a wrong-format value here doesn't silently work insecurely -
+    # `Fernet()` raises immediately on an invalid key, so a forgotten
+    # CHANGEME in staging/production fails app startup outright rather than
+    # running with a weak secret.
+    # TODO: MUST be overridden via env var in staging/production - never use this default.
+    token_encryption_key: str = "zqktkHZVPuFz6ARtdhp8L2czqJ9lt7RTHbwqriwikN8="
 
 
 class CORSSettings(BaseModel):

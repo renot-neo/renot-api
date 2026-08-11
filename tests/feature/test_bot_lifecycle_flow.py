@@ -27,6 +27,7 @@ from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import decrypt_secret
 from app.modules.billing import tasks as billing_tasks
 from app.modules.messaging import tasks as messaging_tasks
 
@@ -91,14 +92,17 @@ async def test_full_bot_lifecycle_from_registration_to_delivery_log(
     #        not the manual dashboard route already covered by
     #        `tests/integration/test_destinations_integration.py`). The
     #        webhook is secret-token-authenticated, not JWT - fetch the
-    #        secret straight from the DB, the same way Telegram itself only
-    #        ever learns it once (at `setWebhook` time) and echoes it back
-    #        on every subsequent call; it never appears in any dashboard
-    #        response.
+    #        secret straight from the DB (encrypted at rest since
+    #        2026-08-12, see
+    #        `private/specs/2026-08-12-bot-secret-encryption-design.md` -
+    #        decrypt it here the same way `bots.service.reveal_webhook_secret`
+    #        does), the same way Telegram itself only ever learns it once
+    #        (at `setWebhook` time) and echoes it back on every subsequent
+    #        call; it never appears in any dashboard response.
     secret_row = await db_session.execute(
-        text("SELECT webhook_secret FROM bots WHERE id = :id"), {"id": bot_id}
+        text("SELECT webhook_secret_encrypted FROM bots WHERE id = :id"), {"id": bot_id}
     )
-    webhook_secret = secret_row.scalar_one()
+    webhook_secret = decrypt_secret(secret_row.scalar_one())
 
     respx.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage").mock(
         return_value=httpx.Response(200, json={"ok": True, "result": {}})

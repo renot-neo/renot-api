@@ -6,21 +6,37 @@ Scope: bot onboarding (register a Telegram bot) and bot CRUD/assignment.
 like every other tenant-scoped entity.
 
 Sensitive fields:
-- `token`: the BotFather token, stored **as-is (plaintext)** - a deliberate
-  decision so it can be used directly to call the Telegram Bot API (getMe,
-  setWebhook, and later sendMessage) without a decryption step. Unlike
-  `api_key_hash`/passwords, which are never read back in plaintext.
-  `token_last_four` (used to mask the token for display, e.g. `...ab12`) is
-  a Python property derived from `token`, not a separate column.
+- `token_encrypted`: the BotFather token, Fernet-encrypted at rest (see
+  `core.security.encrypt_secret`/`decrypt_secret` and
+  `private/specs/2026-08-12-bot-secret-encryption-design.md`). Read back via
+  `service.get_bot_token` - no other module reads this column directly.
+  **History**: an earlier draft of this module encrypted `token` and the
+  user explicitly rejected it (plaintext, "as-is", was the deliberate
+  choice at the time); that decision was reversed 2026-08-12 once the repo
+  went public, per the design doc above - if this comes up again, the
+  plaintext choice was NOT an oversight either time, both were deliberate
+  calls for the context at the time.
+  `token_last_four` (masks the token for display, e.g. `...ab12`) is a
+  real stored column, populated once at create time from the plaintext
+  before it's encrypted - the last 4 characters aren't sensitive on their
+  own (can't reconstruct the real token from them) and can't be derived
+  from ciphertext, so this is no longer a derived property.
 - `api_key_hash`: the per-bot API key for inbound REST calls from external
   apps (via the `X-Bot-Api-Key` header) - a SHA-256 fingerprint (not a slow
   hash like argon2), following the same pattern as `RefreshToken.token_hash`
   in `modules/auth` (a high-entropy secret from `secrets.token_urlsafe`,
   needing a deterministic lookup by value - a different case from a human
   password, which needs a salted slow-hash). `api_key_prefix` is stored
-  plaintext for masked display (format `tgbm_live_xxxx`).
-- `webhook_secret`: validated against the
-  `X-Telegram-Bot-Api-Secret-Token` header on inbound webhooks.
+  plaintext for masked display (format `tgbm_live_xxxx`). Deliberately
+  NOT reversibly encrypted like `token_encrypted` above - this is a
+  one-way lookup key, never read back, so a fingerprint is the right tool,
+  not encryption.
+- `webhook_secret_encrypted`: Fernet-encrypted, same reasoning as
+  `token_encrypted`. Validated against the
+  `X-Telegram-Bot-Api-Secret-Token` header on inbound webhooks (decrypt,
+  then compare - not a fingerprint, since it also doubles as the outbound
+  HMAC callback signing key and HMAC needs the real key bytes). Read back
+  via `service.get_bot_webhook_secret`.
 
 `BotAssignment` (the Bot<->User pivot backing "MEMBER role can only access
 assigned bots") also lives in this module, not in `organizations` - a bot is
@@ -68,24 +84,16 @@ class Bot(TenantScopedBase):
     telegram_bot_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     username: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    token: Mapped[str] = mapped_column(Text, nullable=False)
+    token_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    token_last_four: Mapped[str] = mapped_column(String(4), nullable=False)
 
-    webhook_secret: Mapped[str] = mapped_column(String(255), nullable=False)
+    webhook_secret_encrypted: Mapped[str] = mapped_column(String(255), nullable=False)
     webhook_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     api_key_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     api_key_prefix: Mapped[str] = mapped_column(String(20), nullable=False)
 
     outbound_callback_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
-
-    @property
-    def token_last_four(self) -> str:
-        """Derived from `token` - used by `BotResponse` to mask it for display,
-
-        so the API never returns the full token on a regular response
-        (GET/list), even though the token itself is stored plaintext.
-        """
-        return self.token[-4:] if self.token else ""
 
 
 class BotAssignment(TenantScopedBase):

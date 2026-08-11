@@ -21,6 +21,7 @@ import pytest
 import respx
 from celery.exceptions import Retry
 
+from app.core.security import encrypt_secret
 from app.modules.bots.exceptions import BotNotFoundError
 from app.modules.bots.model import Bot
 from app.modules.destinations.model import Destination, DestinationType
@@ -42,8 +43,9 @@ def _bot(**overrides: object) -> Bot:
         "name": "My Bot",
         "telegram_bot_id": 123456789,
         "username": "mybot",
-        "token": "123456:dummy-token",
-        "webhook_secret": "secret",
+        "token_encrypted": encrypt_secret("123456:dummy-token"),
+        "token_last_four": "oken",
+        "webhook_secret_encrypted": encrypt_secret("secret"),
         "webhook_enabled": True,
         "api_key_hash": "hash",
         "api_key_prefix": "tgbm_live_abcd",

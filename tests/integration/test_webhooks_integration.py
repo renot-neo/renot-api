@@ -19,6 +19,7 @@ from httpx import AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import decrypt_secret
 from app.modules.billing import tasks as billing_tasks
 from app.modules.organizations.model import Organization
 
@@ -29,8 +30,11 @@ async def _create_bot(client_as_owner: AsyncClient, db_session: AsyncSession) ->
     """Returns `(bot_id, webhook_secret)` - `webhook_secret` isn't exposed via
 
     `BotResponse` (never leaves the platform to the dashboard), so it's read
-    straight from the DB, same as Telegram itself would receive it once
-    (at `setWebhook` time) and echo back on every subsequent inbound call.
+    straight from the DB (encrypted at rest since 2026-08-12, decrypted here
+    the same way `bots.service.reveal_webhook_secret` does - see
+    `private/specs/2026-08-12-bot-secret-encryption-design.md`), same as
+    Telegram itself would receive it once (at `setWebhook` time) and echo
+    back on every subsequent inbound call.
     """
     respx.post(f"https://api.telegram.org/bot{TOKEN}/getMe").mock(
         return_value=httpx.Response(
@@ -46,9 +50,9 @@ async def _create_bot(client_as_owner: AsyncClient, db_session: AsyncSession) ->
     bot_id = bot_resp.json()["data"]["id"]
 
     row = await db_session.execute(
-        text("SELECT webhook_secret FROM bots WHERE id = :id"), {"id": bot_id}
+        text("SELECT webhook_secret_encrypted FROM bots WHERE id = :id"), {"id": bot_id}
     )
-    return bot_id, row.scalar_one()
+    return bot_id, decrypt_secret(row.scalar_one())
 
 
 def _mock_send_message() -> None:

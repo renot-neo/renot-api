@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.core.security import encrypt_secret
 from app.modules.bots.exceptions import BotNotFoundError
 from app.modules.bots.model import Bot
 from app.modules.destinations.model import BotDestinationSubscription, SubscriptionStatus
@@ -19,6 +20,12 @@ from app.modules.webhooks import service
 from app.modules.webhooks.exceptions import WebhookSecretInvalidError
 from app.shared.telegram_client import TelegramAPIError
 from app.shared.telegram_types import TelegramChat, TelegramMessage, TelegramUpdate
+
+# The plaintext behind `_bot()`'s default `webhook_secret_encrypted` - tests
+# reference this constant directly (never `bot.webhook_secret`, which no
+# longer exists now that the column only holds ciphertext) when they need
+# to pass the REAL secret as the inbound `X-Telegram-Bot-Api-Secret-Token`.
+_WEBHOOK_SECRET = "s3cr3t"
 
 
 def _bot(**overrides: object) -> Bot:
@@ -28,8 +35,9 @@ def _bot(**overrides: object) -> Bot:
         "name": "My Bot",
         "telegram_bot_id": 123456789,
         "username": "mybot",
-        "token": "123456:dummy-token",
-        "webhook_secret": "s3cr3t",
+        "token_encrypted": encrypt_secret("123456:dummy-token"),
+        "token_last_four": "oken",
+        "webhook_secret_encrypted": encrypt_secret(_WEBHOOK_SECRET),
         "webhook_enabled": True,
         "api_key_hash": "hash",
         "api_key_prefix": "tgbm_live_abcd",
@@ -82,7 +90,7 @@ async def test_handle_telegram_update_propagates_bot_not_found() -> None:
             await service.handle_telegram_update(
                 AsyncMock(),
                 bot_id=uuid.uuid4(),
-                secret_token="s3cr3t",
+                secret_token=_WEBHOOK_SECRET,
                 update=_update("/start"),
             )
 
@@ -99,7 +107,7 @@ async def test_handle_telegram_update_raises_when_secret_missing() -> None:
 
 @pytest.mark.asyncio
 async def test_handle_telegram_update_raises_when_secret_mismatched() -> None:
-    bot = _bot(webhook_secret="expected")
+    bot = _bot(webhook_secret_encrypted=encrypt_secret("expected"))
     with patch("app.modules.webhooks.service.get_bot_for_webhook", AsyncMock(return_value=bot)):
         with pytest.raises(WebhookSecretInvalidError):
             await service.handle_telegram_update(
@@ -118,7 +126,7 @@ async def test_handle_telegram_update_ignores_update_without_message() -> None:
         result = await service.handle_telegram_update(
             AsyncMock(),
             bot_id=bot.id,
-            secret_token=bot.webhook_secret,
+            secret_token=_WEBHOOK_SECRET,
             update=_update(None, has_message=False),
         )
 
@@ -140,7 +148,7 @@ async def test_handle_telegram_update_ignores_non_command_text() -> None:
         result = await service.handle_telegram_update(
             AsyncMock(),
             bot_id=bot.id,
-            secret_token=bot.webhook_secret,
+            secret_token=_WEBHOOK_SECRET,
             update=_update("hello there"),
         )
 
@@ -158,7 +166,7 @@ async def test_handle_telegram_update_ignores_channel_chat() -> None:
         await service.handle_telegram_update(
             AsyncMock(),
             bot_id=bot.id,
-            secret_token=bot.webhook_secret,
+            secret_token=_WEBHOOK_SECRET,
             update=_update("/start", chat_type="channel", title="My Channel", username=None),
         )
 
@@ -178,7 +186,7 @@ async def test_start_command_subscribes_when_webhook_enabled() -> None:
         patch("app.modules.webhooks.service.send_message", AsyncMock()) as send,
     ):
         await service.handle_telegram_update(
-            AsyncMock(), bot_id=bot.id, secret_token=bot.webhook_secret, update=_update("/start")
+            AsyncMock(), bot_id=bot.id, secret_token=_WEBHOOK_SECRET, update=_update("/start")
         )
 
         subscribe.assert_awaited_once()
@@ -204,7 +212,7 @@ async def test_start_command_with_bot_username_suffix_and_args() -> None:
         await service.handle_telegram_update(
             AsyncMock(),
             bot_id=bot.id,
-            secret_token=bot.webhook_secret,
+            secret_token=_WEBHOOK_SECRET,
             update=_update("/start@mybot some-arg"),
         )
 
@@ -220,7 +228,7 @@ async def test_start_command_replies_closed_when_webhook_disabled() -> None:
         patch("app.modules.webhooks.service.send_message", AsyncMock()) as send,
     ):
         result = await service.handle_telegram_update(
-            AsyncMock(), bot_id=bot.id, secret_token=bot.webhook_secret, update=_update("/start")
+            AsyncMock(), bot_id=bot.id, secret_token=_WEBHOOK_SECRET, update=_update("/start")
         )
 
         subscribe.assert_not_called()
@@ -244,7 +252,7 @@ async def test_start_command_replies_blocked_when_subscription_blocked_by_admin(
         patch("app.modules.webhooks.service.send_message", AsyncMock()) as send,
     ):
         await service.handle_telegram_update(
-            AsyncMock(), bot_id=bot.id, secret_token=bot.webhook_secret, update=_update("/start")
+            AsyncMock(), bot_id=bot.id, secret_token=_WEBHOOK_SECRET, update=_update("/start")
         )
 
         assert "blocked" in send.await_args.kwargs["text"].lower()
@@ -265,7 +273,7 @@ async def test_start_command_resolves_group_thread_context() -> None:
         await service.handle_telegram_update(
             AsyncMock(),
             bot_id=bot.id,
-            secret_token=bot.webhook_secret,
+            secret_token=_WEBHOOK_SECRET,
             update=_update(
                 "/start", chat_type="supergroup", chat_id=-100999, message_thread_id=5, title="Grp"
             ),
@@ -288,7 +296,7 @@ async def test_stop_command_replies_unsubscribed_when_found() -> None:
         patch("app.modules.webhooks.service.send_message", AsyncMock()) as send,
     ):
         await service.handle_telegram_update(
-            AsyncMock(), bot_id=bot.id, secret_token=bot.webhook_secret, update=_update("/stop")
+            AsyncMock(), bot_id=bot.id, secret_token=_WEBHOOK_SECRET, update=_update("/stop")
         )
 
         assert "unsubscribed" in send.await_args.kwargs["text"].lower()
@@ -303,7 +311,7 @@ async def test_stop_command_replies_not_subscribed_when_none() -> None:
         patch("app.modules.webhooks.service.send_message", AsyncMock()) as send,
     ):
         await service.handle_telegram_update(
-            AsyncMock(), bot_id=bot.id, secret_token=bot.webhook_secret, update=_update("/stop")
+            AsyncMock(), bot_id=bot.id, secret_token=_WEBHOOK_SECRET, update=_update("/stop")
         )
 
         assert "weren't subscribed" in send.await_args.kwargs["text"].lower()
@@ -319,7 +327,7 @@ async def test_status_command_replies_with_chat_and_thread_id() -> None:
         await service.handle_telegram_update(
             AsyncMock(),
             bot_id=bot.id,
-            secret_token=bot.webhook_secret,
+            secret_token=_WEBHOOK_SECRET,
             update=_update(
                 "/status", chat_type="supergroup", chat_id=-100999, message_thread_id=5, title="Grp"
             ),
@@ -338,7 +346,7 @@ async def test_help_command_replies_with_help_url() -> None:
         patch("app.modules.webhooks.service.send_message", AsyncMock()) as send,
     ):
         await service.handle_telegram_update(
-            AsyncMock(), bot_id=bot.id, secret_token=bot.webhook_secret, update=_update("/help")
+            AsyncMock(), bot_id=bot.id, secret_token=_WEBHOOK_SECRET, update=_update("/help")
         )
 
         assert "http" in send.await_args.kwargs["text"]
@@ -357,5 +365,5 @@ async def test_reply_send_failure_does_not_raise() -> None:
         # Must not raise - a failed reply doesn't fail webhook processing
         # (the DB state is already committed regardless).
         await service.handle_telegram_update(
-            AsyncMock(), bot_id=bot.id, secret_token=bot.webhook_secret, update=_update("/help")
+            AsyncMock(), bot_id=bot.id, secret_token=_WEBHOOK_SECRET, update=_update("/help")
         )

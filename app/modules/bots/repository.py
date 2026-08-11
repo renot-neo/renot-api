@@ -32,19 +32,25 @@ class BotRepository:
         name: str,
         telegram_bot_id: int,
         username: str,
-        token: str,
-        webhook_secret: str,
+        token_encrypted: str,
+        token_last_four: str,
+        webhook_secret_encrypted: str,
         api_key_hash: str,
         api_key_prefix: str,
         outbound_callback_url: str | None = None,
     ) -> Bot:
+        # Takes already-encrypted values, never plaintext - encryption is a
+        # service-layer decision (`service.py`'s `_hash_api_key`-style
+        # helpers), this layer is pure data access. See
+        # `private/specs/2026-08-12-bot-secret-encryption-design.md`.
         bot = Bot(
             tenant_id=tenant_id,
             name=name,
             telegram_bot_id=telegram_bot_id,
             username=username,
-            token=token,
-            webhook_secret=webhook_secret,
+            token_encrypted=token_encrypted,
+            token_last_four=token_last_four,
+            webhook_secret_encrypted=webhook_secret_encrypted,
             api_key_hash=api_key_hash,
             api_key_prefix=api_key_prefix,
             outbound_callback_url=outbound_callback_url,

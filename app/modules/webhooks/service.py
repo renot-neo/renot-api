@@ -36,7 +36,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.modules.bots import Bot, get_bot_for_webhook
+from app.modules.bots import Bot, get_bot_for_webhook, reveal_token, reveal_webhook_secret
 from app.modules.destinations import (
     DestinationType,
     SubscriptionStatus,
@@ -78,7 +78,7 @@ async def handle_telegram_update(
     single point of commit->enqueue responsibility as other modules.
     """
     bot = await get_bot_for_webhook(session, bot_id=bot_id)
-    if not secret_token or secret_token != bot.webhook_secret:
+    if not secret_token or secret_token != reveal_webhook_secret(bot):
         raise WebhookSecretInvalidError()
 
     message = update.message
@@ -175,7 +175,9 @@ async def _handle_help(*, bot: Bot, chat_id: int, thread_id: int | None) -> None
 
 async def _reply(bot: Bot, *, chat_id: int, thread_id: int | None, text: str) -> None:
     try:
-        await send_message(bot.token, chat_id=chat_id, text=text, message_thread_id=thread_id)
+        await send_message(
+            reveal_token(bot), chat_id=chat_id, text=text, message_thread_id=thread_id
+        )
     except TelegramAPIError as exc:
         # A failed reply must not fail webhook processing (the DB state is
         # already committed regardless) - just log it.

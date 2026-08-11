@@ -44,7 +44,7 @@ from app.core.celery_app import celery_app
 from app.core.database import WorkerAsyncSessionFactory
 from app.core.exceptions import AppException
 from app.modules.billing import enqueue_event_out
-from app.modules.bots import Bot, get_bot
+from app.modules.bots import Bot, get_bot, reveal_token, reveal_webhook_secret
 from app.modules.destinations import Destination, get_destination
 from app.modules.messaging import service
 from app.modules.messaging.model import (
@@ -219,7 +219,9 @@ async def _fire_outbound_callback(
         "sent_at": log.sent_at.isoformat() if log.sent_at else None,
     }
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    signature = hmac.new(bot.webhook_secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    signature = hmac.new(
+        reveal_webhook_secret(bot).encode("utf-8"), body, hashlib.sha256
+    ).hexdigest()
 
     try:
         async with httpx.AsyncClient(timeout=_OUTBOUND_CALLBACK_TIMEOUT_SECONDS) as client:
@@ -288,7 +290,7 @@ async def _process_delivery(delivery_log_id: str) -> str:
         if not throttle_ok:
             return "throttled"
 
-        result = await _send_via_telegram(bot.token, destination, message)
+        result = await _send_via_telegram(reveal_token(bot), destination, message)
 
         telegram_message_id = result.get("message_id")
         await delivery_repo.mark_sent(log, telegram_message_id=telegram_message_id)

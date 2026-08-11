@@ -1,8 +1,9 @@
-"""JWT encode/decode, password hashing.
+"""JWT encode/decode, password hashing, symmetric secret encryption.
 
-Pure utilities - no DB access, no knowledge of the `User` model. Callers
-(e.g. `modules/auth/service.py`) are responsible for loading/persisting data
-and translating errors raised here into the appropriate `AppException`.
+Pure utilities - no DB access, no knowledge of the `User`/`Bot` models.
+Callers (e.g. `modules/auth/service.py`, `modules/bots/service.py`) are
+responsible for loading/persisting data and translating errors raised here
+into the appropriate `AppException`.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from cryptography.fernet import Fernet
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -71,6 +73,34 @@ def decode_token(token: str) -> dict[str, Any]:
     return jwt.decode(token, settings.jwt.secret_key, algorithms=[settings.jwt.algorithm])
 
 
+def encrypt_secret(plaintext: str) -> str:
+    """Fernet-encrypt a high-entropy secret for at-rest storage (e.g.
+
+    `Bot.token`/`Bot.webhook_secret` - see
+    `private/specs/2026-08-12-bot-secret-encryption-design.md`). Not for
+    passwords - `hash_password` above is the one-way, slow-hash tool for
+    those; this is reversible symmetric encryption for secrets the app
+    itself needs to read back later (a Telegram bot token, an HMAC key).
+
+    A fresh random IV/IV+timestamp goes into every call (Fernet's own
+    design), so encrypting the same plaintext twice yields different
+    ciphertext - never compare ciphertext for equality, decrypt and compare
+    plaintext instead.
+    """
+    fernet = Fernet(settings.telegram.token_encryption_key)
+    return fernet.encrypt(plaintext.encode("utf-8")).decode("utf-8")
+
+
+def decrypt_secret(ciphertext: str) -> str:
+    """Inverse of `encrypt_secret`. Raises `cryptography.fernet.InvalidToken`
+
+    on tampered/corrupted ciphertext or a wrong key - Fernet's own
+    authentication (HMAC), not something this wrapper adds.
+    """
+    fernet = Fernet(settings.telegram.token_encryption_key)
+    return fernet.decrypt(ciphertext.encode("utf-8")).decode("utf-8")
+
+
 __all__ = [
     "JWTError",
     "hash_password",
@@ -78,4 +108,6 @@ __all__ = [
     "create_access_token",
     "create_refresh_token",
     "decode_token",
+    "encrypt_secret",
+    "decrypt_secret",
 ]

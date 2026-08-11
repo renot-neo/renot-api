@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.pagination import Page, PageParams
+from app.core.security import decrypt_secret, encrypt_secret
 from app.modules.bots.exceptions import (
     BotAlreadyRegisteredError,
     BotApiKeyInvalidError,
@@ -99,8 +100,9 @@ async def register_bot(
         name=name,
         telegram_bot_id=telegram_bot_id,
         username=me.get("username", ""),
-        token=token,
-        webhook_secret=webhook_secret,
+        token_encrypted=encrypt_secret(token),
+        token_last_four=token[-4:] if token else "",
+        webhook_secret_encrypted=encrypt_secret(webhook_secret),
         api_key_hash=api_key_hash,
         api_key_prefix=api_key_prefix,
         outbound_callback_url=outbound_callback_url,
@@ -200,14 +202,43 @@ async def cascade_delete_for_organization(session: AsyncSession, *, tenant_id: u
         await bots.soft_delete(bot)
 
 
-async def get_bot_token(session: AsyncSession, *, tenant_id: uuid.UUID, bot_id: uuid.UUID) -> str:
-    """Used by other modules (e.g. `modules/messaging`) via the public
+def reveal_token(bot: Bot) -> str:
+    """Decrypts `Bot.token_encrypted` on an already-loaded `Bot` (from
 
-    service interface (`app.modules.bots`) to call the Telegram API on this
-    bot's behalf - no other module is allowed to read `Bot.token` directly.
+    `get_bot`/`get_bot_for_webhook`/etc.) - for callers (e.g.
+    `modules/messaging`, `modules/webhooks`) that already hold the object
+    and would otherwise need a second DB round-trip through
+    `get_bot_token` below just to decrypt a field they already have.
+    Keeps the encryption scheme (Fernet, `core.security`) an implementation
+    detail of this module - callers never import
+    `core.security.decrypt_secret` themselves, and never read
+    `Bot.token_encrypted` directly.
+    """
+    return decrypt_secret(bot.token_encrypted)
+
+
+def reveal_webhook_secret(bot: Bot) -> str:
+    """Mirrors `reveal_token` above, for `Bot.webhook_secret_encrypted`."""
+    return decrypt_secret(bot.webhook_secret_encrypted)
+
+
+async def get_bot_token(session: AsyncSession, *, tenant_id: uuid.UUID, bot_id: uuid.UUID) -> str:
+    """For callers that only have `(tenant_id, bot_id)`, not an already-loaded
+
+    `Bot` - fetches then decrypts via `reveal_token`. Prefer `reveal_token`
+    directly if the caller already has a `Bot` object (avoids a redundant
+    query).
     """
     bot = await get_bot(session, tenant_id=tenant_id, bot_id=bot_id)
-    return bot.token
+    return reveal_token(bot)
+
+
+async def get_bot_webhook_secret(
+    session: AsyncSession, *, tenant_id: uuid.UUID, bot_id: uuid.UUID
+) -> str:
+    """Mirrors `get_bot_token` above, for `Bot.webhook_secret_encrypted`."""
+    bot = await get_bot(session, tenant_id=tenant_id, bot_id=bot_id)
+    return reveal_webhook_secret(bot)
 
 
 async def get_bot_by_api_key(session: AsyncSession, api_key: str) -> Bot:

@@ -11,7 +11,10 @@ import uuid
 import httpx
 import respx
 from httpx import AsyncClient
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import decrypt_secret
 from app.modules.auth import User
 
 TOKEN = "123456:integration-test-token"
@@ -52,6 +55,39 @@ async def test_owner_can_register_bot_and_receives_api_key_once(
     assert body["username"] == "integration_test_bot"
     assert body["api_key"].startswith("tgbm_live_")
     assert body["token_last_four"] == TOKEN[-4:]
+
+
+@respx.mock
+async def test_registered_bot_token_is_encrypted_at_rest(
+    client_as_owner: AsyncClient, db_session: AsyncSession
+) -> None:
+    """The response payload looking right (previous test) is not proof the
+
+    stored value is actually encrypted - query the raw column directly, the
+    same "verify the DB, don't trust the response alone" precedent as
+    session 8's `GET /billing/usage` lazy-write bug. See
+    `private/specs/2026-08-12-bot-secret-encryption-design.md`.
+    """
+    _mock_get_me()
+    _mock_set_webhook()
+
+    response = await client_as_owner.post("/api/v1/bots", json={"name": "My Bot", "token": TOKEN})
+    assert response.status_code == 201
+    bot_id = response.json()["data"]["id"]
+
+    row = await db_session.execute(
+        text("SELECT token_encrypted, webhook_secret_encrypted FROM bots WHERE id = :id"),
+        {"id": bot_id},
+    )
+    token_encrypted, webhook_secret_encrypted = row.one()
+
+    assert TOKEN not in token_encrypted
+    assert decrypt_secret(token_encrypted) == TOKEN
+    # The webhook secret is app-generated (not user input) - only assert it
+    # decrypts to SOME non-empty string, its exact value isn't observable
+    # from the API by design (see the feature test's step 4 for how it's
+    # otherwise obtained).
+    assert decrypt_secret(webhook_secret_encrypted)
 
 
 @respx.mock
