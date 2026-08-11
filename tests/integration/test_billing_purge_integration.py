@@ -19,7 +19,9 @@ directly - there's no public endpoint for that, reasonable for simulating
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from unittest.mock import Mock
 
 import httpx
 import respx
@@ -29,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.billing import service as billing_service
 from app.modules.messaging import purge_delivery_logs_batch
+from app.modules.messaging import tasks as messaging_tasks
 from app.modules.organizations.model import Organization
 
 TOKEN = "123456:purge-integration-token"
@@ -59,11 +62,21 @@ async def test_purge_only_deletes_rows_older_than_plan_retention(
     client_as_owner: AsyncClient,
     db_session: AsyncSession,
     test_organization: Organization,
+    patch_task_delay: Callable[[object], Mock],
 ) -> None:
     # Assign the org an active Plan first (lazy assign-on-read) -
     # `get_purge_targets` only sees orgs with an active `OrganizationPlan` row.
     usage_resp = await client_as_owner.get("/api/v1/billing/usage")
     assert usage_resp.status_code == 200
+
+    # The two `POST /api/v1/messages` calls below fire a real
+    # `send_message_to_destination.delay(...)` (router->DB->Celery pattern) -
+    # mocked here same as every other messaging-integration test (see
+    # `tests/support/db.py`'s module docstring). Without this, `.delay()`
+    # tries to reach a real Celery broker/result backend - this test only
+    # needs the resulting `DeliveryLog` rows to exist for the purge logic
+    # under test, not actual task dispatch.
+    patch_task_delay(messaging_tasks.send_message_to_destination)
 
     bot_id, destination_id = await _create_bot_and_destination(client_as_owner)
 
