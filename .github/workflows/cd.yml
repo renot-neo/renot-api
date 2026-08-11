@@ -14,6 +14,11 @@ name: CD
 #   PR) -> `build-and-push-tagged` (tags the image with the version) -
 #   these are the builds the public actually pulls. See
 #   release-please.yml's own comment for why that chain needs a PAT.
+#
+# Every published image also gets an SBOM (native buildx feature) and a
+# GitHub Artifact Attestation (Sigstore-based build provenance, verifiable
+# via `gh attestation verify ghcr.io/renot-neo/renot-api:<tag>`) - see
+# private/PUBLIC_RELEASE_ROADMAP.md section 16.
 
 on:
   push:
@@ -30,6 +35,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v7
 
@@ -40,14 +47,23 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: docker/build-push-action@v7
+        id: build
         with:
           context: .
           file: docker/Dockerfile
           target: runtime
           push: true
+          sbom: true
+          provenance: true
           tags: |
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
 
   build-and-push-tagged:
     if: github.ref_type == 'tag'
@@ -55,6 +71,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v7
 
@@ -65,10 +83,19 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: docker/build-push-action@v7
+        id: build
         with:
           context: .
           file: docker/Dockerfile
           target: runtime
           push: true
+          sbom: true
+          provenance: true
           tags: |
             ${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
