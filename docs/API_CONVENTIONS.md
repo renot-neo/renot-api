@@ -9,8 +9,10 @@ time — this document covers what the contract looks like today.
 List endpoints accept `page` and `page_size` query parameters:
 
 - `page`: 1-indexed, defaults to `1`.
-- `page_size`: defaults to `20`, maximum `100`. Values above the maximum
-  are clamped, not rejected.
+- `page_size`: defaults to `20`, maximum `100`. Out-of-range `page`/`page_size`
+  values (below `1`, or `page_size` above `100`) are rejected with a
+  `422 Unprocessable` response by FastAPI's request validation, before the
+  request reaches any handler code.
 
 Paginated responses wrap their `data` as:
 
