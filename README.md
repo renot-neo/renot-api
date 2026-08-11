@@ -1,6 +1,37 @@
 # RENOT API
 
+[![CI](https://github.com/<your-org>/renot-api/actions/workflows/ci.yml/badge.svg)](https://github.com/<your-org>/renot-api/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+> **Status:** Pre-1.0 (`0.x`), following [SemVer](https://semver.org/) —
+> breaking changes may land in a minor release until `1.0.0`.
+
 A multi-tenant B2B SaaS platform for centralized Telegram bot management — register Telegram bots, manage subscriber destinations (chats/groups/channels), and send/schedule messages (text, media, polls) with delivery tracking, usage metering, and per-plan retention.
+
+## Quick example
+
+```bash
+curl -X POST https://your-domain.example.com/api/v1/messages \
+  -H "X-Bot-Api-Key: <bot-api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bot_id": "b3f1c2a0-1234-4a5b-8c9d-abcdef123456",
+    "destination_ids": ["d1a2e4f6-1234-4a5b-8c9d-abcdef123456"],
+    "content_type": "text",
+    "text": "Deployment finished ✅"
+  }'
+```
+
+```json
+{
+  "success": true,
+  "data": { "message_id": "f4e2c1a0-1234-4a5b-8c9d-abcdef123456", "status": "queued" },
+  "meta": { "request_id": "...", "timestamp": "..." },
+  "error": null
+}
+```
+
+See [docs/API_CONVENTIONS.md](docs/API_CONVENTIONS.md) for the full request/response shape, auth, and rate limits.
 
 ## Tech stack
 
@@ -29,6 +60,32 @@ Modules: `auth`, `organizations`, `bots`, `destinations`, `messaging`, `billing`
 Cross-module communication always goes through a module's `__init__.py` interface — never `from app.modules.x.model import Y` across module boundaries. This keeps each module free to change its internals without breaking others, and keeps the dependency graph explicit.
 
 Cross-cutting infrastructure (DB session, JWT/permission dependencies, pagination, the response envelope, exception handling, middleware) lives in `app/core/`. Shared pure utilities (the Telegram HTTP client, Telegram-specific Pydantic types) live in `app/shared/`.
+
+```mermaid
+graph TD
+    core["app/core/<br/>(DB session, auth deps, pagination,<br/>response envelope, middleware)"]
+    auth[auth]
+    organizations[organizations]
+    bots[bots]
+    destinations[destinations]
+    messaging[messaging]
+    billing[billing]
+    webhooks[webhooks]
+
+    core --- auth
+    core --- organizations
+    core --- bots
+    core --- destinations
+    core --- messaging
+    core --- billing
+    core --- webhooks
+
+    organizations --> bots
+    bots --> destinations
+    bots --> messaging
+    messaging --> billing
+    webhooks --> bots
+```
 
 ## Getting started
 
@@ -67,6 +124,14 @@ New migration:
 alembic revision --autogenerate -m "description"
 ```
 
+### 4. Explore the API
+
+Once running locally, interactive API docs are available at
+`http://localhost:8000/docs` (Swagger UI) and `http://localhost:8000/redoc`
+(ReDoc). These are automatically disabled in production — see
+[docs/API_CONVENTIONS.md](docs/API_CONVENTIONS.md) for the API reference
+that stays available regardless of environment.
+
 ## Running tests
 
 Tests are split into three tiers:
@@ -97,6 +162,17 @@ Or install the pre-commit hooks to run these automatically:
 ```bash
 pre-commit install
 ```
+
+## Documentation
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — dev setup, testing, PR flow
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- [SECURITY.md](SECURITY.md) — vulnerability disclosure
+- [SUPPORT.md](SUPPORT.md) — how to ask for help
+- [docs/DATA_HANDLING.md](docs/DATA_HANDLING.md) — what's stored, retention, self-hoster backup guidance
+- [docs/API_VERSIONING.md](docs/API_VERSIONING.md) — backward-compatibility policy
+- [docs/API_CONVENTIONS.md](docs/API_CONVENTIONS.md) — pagination, rate limits, error format, auth
+- [LICENSE](LICENSE) — MIT
 
 ## Project structure
 
