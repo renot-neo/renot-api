@@ -12,18 +12,23 @@ service, a Privacy Policy/ToS would be a separate, business-owned document.
 | --- | --- | --- |
 | `User.password_hash` | Hashed | No auto-purge (active account data) |
 | `Bot.api_key_hash` | Hashed | No auto-purge (active resource) |
-| `Bot.token` (the real Telegram bot token) | 🔴 **Plaintext** — no encryption module exists in `app/` today | Kept as long as the bot exists |
-| `Bot.webhook_secret` (validated against the `X-Telegram-Bot-Api-Secret-Token` header on inbound webhooks) | 🔴 **Plaintext** — no encryption module exists in `app/` today | Kept as long as the bot exists |
+| `Bot.token` (the real Telegram bot token) | 🟢 Encrypted at rest (Fernet, `TELEGRAM__TOKEN_ENCRYPTION_KEY`) | Kept as long as the bot exists |
+| `Bot.webhook_secret` (validated against the `X-Telegram-Bot-Api-Secret-Token` header on inbound webhooks) | 🟢 Encrypted at rest (Fernet, `TELEGRAM__TOKEN_ENCRYPTION_KEY`) | Kept as long as the bot exists |
 | `RefreshToken.token_hash` | Hashed | Kept until revoked/expired (not auto-purged) |
 | `User.email` / `User.full_name` | Plaintext PII | No auto-purge (active account data) |
 | `Destination.chat_id` / `Destination.title` (Telegram chat/group/channel identifiers) | Plaintext | No auto-purge |
 | `Message` / `MessageTemplate` content (actual message text/media/poll data) | Plaintext, soft-delete only | 🔴 Not covered by the automated retention purge below — content persists indefinitely (soft-deleted, recoverable) |
 | `DeliveryLog`, `UsageEvent` | Plaintext | Auto-purged per organization's `Plan.retention_days` (daily job, see below) |
 
-**`Bot.token` and `Bot.webhook_secret` are stored in plaintext.** This is a
-known, currently accepted gap — encrypting them at rest is tracked as a
-future security improvement, not implemented today. Stated here plainly so
-self-hosters can make an informed decision, not glossed over.
+**`Bot.token` and `Bot.webhook_secret` are encrypted at rest** (Fernet -
+authenticated symmetric encryption, via the `cryptography` package), keyed
+by a single static key from the `TELEGRAM__TOKEN_ENCRYPTION_KEY` env var.
+Self-hosters: this key is the one secret that, if lost, makes every stored
+bot token/webhook secret unrecoverable (nothing else can decrypt them) -
+back it up like any other production secret, separately from your database
+backups. If it's ever compromised, treat it the same as a full plaintext
+leak of every `Bot.token`/`webhook_secret` and rotate every affected bot's
+Telegram token via `@BotFather`.
 
 ## Automated retention purge
 
@@ -37,13 +42,20 @@ the *only* automated data deletion in the system — it does not touch
 ## Mitigation recommendations for self-hosters
 
 - **Restrict database access** to the application and trusted operators
-  only — given `Bot.token` is plaintext, DB access is equivalent to bot
-  credential access.
+  only. `Bot.token`/`webhook_secret` are encrypted, so DB access alone
+  isn't equivalent to bot credential access anymore — but treat it as
+  equivalent anyway if the same operators/hosts also have access to
+  `TELEGRAM__TOKEN_ENCRYPTION_KEY` (commonly true, e.g. the same `.env`
+  file or secrets manager).
+- **Keep `TELEGRAM__TOKEN_ENCRYPTION_KEY` separate from your database
+  backups** — a DB dump alone is not enough to recover bot tokens without
+  it, which is the point of encrypting them; don't undo that by storing
+  both together.
 - **Encrypt disks at rest** for whatever host runs Postgres.
 - **Rotate a bot's Telegram token** (via `@BotFather`) if you ever suspect
-  the database has been compromised — treat any DB exposure as a token
-  leak. Rotate each bot's `webhook_secret` too (re-register the webhook),
-  since it's stored plaintext alongside the token.
+  the database AND the encryption key have both been compromised — treat
+  that combination as a full token leak. Rotate each bot's
+  `webhook_secret` too (re-register the webhook).
 - **Restrict Redis access** the same way — it holds Celery broker/result
   state and rate-limit counters; not a durable store, but still
   operationally sensitive while a request is in flight.
