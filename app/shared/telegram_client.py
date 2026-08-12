@@ -83,7 +83,7 @@ async def send_message(
 ) -> dict[str, Any]:
     """Sends a text message - used by `modules/webhooks` (built-in command
 
-    replies, plain without `parse_mode`/`reply_markup`) and
+    replies, always with `parse_mode="HTML"`, without `reply_markup`) and
     `modules/messaging` (a text-type `Message`, with optional
     `parse_mode`/`reply_markup`). `reply_markup` is already a Telegram-shape
     dict (`InlineKeyboardMarkup.model_dump(exclude_none=True)` from

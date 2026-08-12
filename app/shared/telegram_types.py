@@ -6,7 +6,7 @@ Used across modules (`messaging`, `bots`, `webhooks`).
 A subset of Telegram's inbound Update (`TelegramChat`/`TelegramMessage`/
 `TelegramUpdate`) was added for `modules/webhooks` - fields are limited to
 what the built-in command handlers actually use (`/start`, `/stop`,
-`/status`, `/help`), NOT a full representation of Telegram's Update schema
+`/status`, `/help`, `/about`), NOT a full representation of Telegram's Update schema
 (which has dozens of optional fields: `edited_message`, `callback_query`,
 `my_chat_member`, etc. - out of scope for this MVP).
 `model_config = ConfigDict(extra="ignore")` so a field that isn't modeled

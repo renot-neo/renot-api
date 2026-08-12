@@ -80,7 +80,8 @@ _REGISTRATION_CLOSED_TEMPLATE = (
     "Please contact the administrator if you believe this is unexpected."
 )
 _UNSUBSCRIBED_TEMPLATE = (
-    "👋 You've been unsubscribed from {bot_name}. You won't receive any more notifications here.\n\n"
+    "👋 You've been unsubscribed from {bot_name}. "
+    "You won't receive any more notifications here.\n\n"
     "Send /start anytime if you'd like to subscribe again."
 )
 _NOT_SUBSCRIBED_TEMPLATE = (
