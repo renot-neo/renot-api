@@ -15,7 +15,11 @@ import pytest
 from app.core.security import encrypt_secret
 from app.modules.bots.exceptions import BotNotFoundError
 from app.modules.bots.model import Bot
-from app.modules.destinations.model import BotDestinationSubscription, SubscriptionStatus
+from app.modules.destinations.model import (
+    BotDestinationSubscription,
+    DestinationType,
+    SubscriptionStatus,
+)
 from app.modules.webhooks import service
 from app.modules.webhooks.exceptions import WebhookSecretInvalidError
 from app.shared.telegram_client import TelegramAPIError
@@ -281,6 +285,35 @@ async def test_start_command_resolves_group_thread_context() -> None:
 
         assert subscribe.await_args.kwargs["thread_id"] == 5
         assert subscribe.await_args.kwargs["chat_id"] == -100999
+
+
+@pytest.mark.asyncio
+async def test_start_command_resolves_plain_group_without_thread() -> None:
+    """A regular (non-supergroup, non-forum) group has no
+
+    `message_thread_id` at all - distinct from the group+thread case above,
+    which takes the `GROUP_THREAD` branch instead.
+    """
+    bot = _bot(webhook_enabled=True)
+    subscription = _subscription(status=SubscriptionStatus.ACTIVE)
+    with (
+        patch("app.modules.webhooks.service.get_bot_for_webhook", AsyncMock(return_value=bot)),
+        patch(
+            "app.modules.webhooks.service.subscribe_via_start",
+            AsyncMock(return_value=(object(), subscription)),
+        ) as subscribe,
+        patch("app.modules.webhooks.service.send_message", AsyncMock()),
+    ):
+        await service.handle_telegram_update(
+            AsyncMock(),
+            bot_id=bot.id,
+            secret_token=_WEBHOOK_SECRET,
+            update=_update("/start", chat_type="group", chat_id=-100888, title="Plain Grp"),
+        )
+
+        assert subscribe.await_args.kwargs["type"] == DestinationType.GROUP
+        assert subscribe.await_args.kwargs["thread_id"] is None
+        assert subscribe.await_args.kwargs["chat_id"] == -100888
 
 
 @pytest.mark.asyncio

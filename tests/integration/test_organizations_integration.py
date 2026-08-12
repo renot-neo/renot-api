@@ -86,6 +86,36 @@ async def test_owner_and_admin_can_add_member_but_member_cannot(
     assert member_resp.json()["error"]["code"] == "INSUFFICIENT_PERMISSION"
 
 
+async def test_owner_can_add_a_genuinely_new_member(
+    client: AsyncClient, client_as_owner: AsyncClient, test_organization: Organization
+) -> None:
+    """The success path - both existing add_member tests above only hit
+
+    error branches (`MEMBER_USER_NOT_FOUND` for an unregistered email,
+    `ALREADY_MEMBER` below for an existing one), neither ever reaches this
+    endpoint's actual 201 response. Needs a real, freshly-registered (but
+    not yet a member) user to do that.
+    """
+    register_resp = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "new-member@example.com",
+            "password": "TestPassword123!",
+            "full_name": "New Member",
+        },
+    )
+    assert register_resp.status_code == 201
+
+    response = await client_as_owner.post(
+        f"/api/v1/organizations/{test_organization.id}/members",
+        json={"email": "new-member@example.com", "role": "member"},
+    )
+
+    assert response.status_code == 201
+    body = response.json()["data"]
+    assert body["role"] == "member"
+
+
 async def test_add_member_rejects_already_member(
     client_as_owner: AsyncClient, test_organization: Organization, test_user_admin: User
 ) -> None:

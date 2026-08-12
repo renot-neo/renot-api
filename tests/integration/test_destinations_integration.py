@@ -144,6 +144,27 @@ async def test_subscription_update_for_unknown_bot_returns_404(
 
 
 @respx.mock
+async def test_get_destination_returns_detail(client_as_owner: AsyncClient) -> None:
+    """The success path - the only other test hitting this same URL
+
+    (`test_delete_destination_soft_deletes` below) only ever exercises the
+    404-after-delete branch, never a genuine 200 detail response.
+    """
+    bot_id = await _create_bot(client_as_owner)
+    create_resp = await client_as_owner.post(
+        "/api/v1/destinations",
+        json={"bot_id": bot_id, "type": "personal", "chat_id": 777, "title": "Detail Me"},
+    )
+    destination_id = create_resp.json()["data"]["id"]
+
+    response = await client_as_owner.get(f"/api/v1/destinations/{destination_id}")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["id"] == destination_id
+    assert response.json()["data"]["title"] == "Detail Me"
+
+
+@respx.mock
 async def test_delete_destination_soft_deletes(client_as_owner: AsyncClient) -> None:
     bot_id = await _create_bot(client_as_owner)
     create_resp = await client_as_owner.post(

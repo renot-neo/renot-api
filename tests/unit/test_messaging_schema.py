@@ -98,6 +98,17 @@ def test_poll_rejects_inline_keyboard() -> None:
         )
 
 
+def test_poll_field_forbidden_when_content_type_is_not_poll() -> None:
+    with pytest.raises(ValidationError, match="only allowed when `content_type=poll`"):
+        MessageCreate(
+            bot_id=_BOT_ID,
+            destination_ids=[_DEST_ID],
+            content_type=MessageContentType.TEXT,
+            text="hi",
+            poll=PollInput(question="Q?", options=["A", "B"]),
+        )
+
+
 def test_template_id_forbids_explicit_text() -> None:
     with pytest.raises(ValidationError):
         MessageCreate(

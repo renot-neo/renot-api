@@ -20,9 +20,10 @@ import uuid
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from fastapi.security import HTTPAuthorizationCredentials
 
 from app.core import deps
-from app.core.security import JWTError
+from app.core.security import JWTError, create_refresh_token
 from app.modules.auth.exceptions import (
     NoActiveOrganizationError,
     TokenInvalidError,
@@ -136,6 +137,32 @@ async def test_check_permission_passes_when_all_checks_ok() -> None:
         await deps.check_permission(
             AsyncMock(), user_id=uuid.uuid4(), tenant_id=uuid.uuid4(), permission="bot:view"
         )
+
+
+# --- _decode_bearer_token ---
+# Historically untested directly (see the module docstring) - covered
+# indirectly via `tests/integration`'s real FastAPI DI stack, but no
+# integration test ever sends a genuinely malformed/wrong-type bearer
+# token (only "no credentials at all", which FastAPI's own
+# `HTTPBearer(auto_error=True)` rejects before this function's body ever
+# runs) - added directly here instead of via HTTP for that reason.
+
+
+@pytest.mark.asyncio
+async def test_decode_bearer_token_raises_when_token_undecodable() -> None:
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="not-a-real-jwt")
+
+    with pytest.raises(TokenInvalidError):
+        await deps._decode_bearer_token(credentials)
+
+
+@pytest.mark.asyncio
+async def test_decode_bearer_token_raises_when_token_type_is_not_access() -> None:
+    refresh_token = create_refresh_token(subject=str(uuid.uuid4()))
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=refresh_token)
+
+    with pytest.raises(TokenInvalidError):
+        await deps._decode_bearer_token(credentials)
 
 
 # --- get_optional_jwt_payload ---

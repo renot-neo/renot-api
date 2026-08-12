@@ -155,6 +155,18 @@ def test_compute_overall_status_partially_failed_when_mixed_sent_and_failed() ->
     assert service.compute_overall_status(message, logs) == "partially_failed"
 
 
+def test_compute_overall_status_sent_when_no_delivery_logs_at_all() -> None:
+    """An immediate (non-scheduled) message with zero `DeliveryLog` rows -
+
+    e.g. every destination was already unsubscribed at send time, so
+    nothing was ever queued. Distinct from the "scheduled, not dispatched
+    yet" case above (also zero logs, but for a different reason and a
+    different expected status).
+    """
+    message = _message(scheduled_at=None, dispatched_at=None)
+    assert service.compute_overall_status(message, []) == "sent"
+
+
 # --- message template CRUD ---
 
 
@@ -194,6 +206,22 @@ async def test_update_message_template_only_changes_provided_fields() -> None:
 
         assert updated.name == "New"
         assert updated.body == "Old body"
+
+
+@pytest.mark.asyncio
+async def test_update_message_template_can_change_parse_mode() -> None:
+    existing = _template(parse_mode=None)
+    with patch("app.modules.messaging.service.MessageTemplateRepository") as repo_cls:
+        repo_cls.return_value.get_active = AsyncMock(return_value=existing)
+
+        updated = await service.update_message_template(
+            AsyncMock(),
+            tenant_id=uuid.uuid4(),
+            template_id=existing.id,
+            parse_mode=ParseMode.HTML,
+        )
+
+        assert updated.parse_mode == ParseMode.HTML
 
 
 @pytest.mark.asyncio

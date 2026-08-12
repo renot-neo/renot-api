@@ -150,6 +150,34 @@ async def test_refresh_rejects_access_token_used_as_refresh_token() -> None:
 
 
 @pytest.mark.asyncio
+async def test_refresh_rejects_when_owning_user_is_inactive() -> None:
+    """The stored refresh token itself is still valid/unexpired, but the
+
+    user it belongs to was deactivated in the meantime - must not rotate a
+    new token pair for a deactivated account.
+    """
+    user = _make_user(is_active=False)
+    refresh_value = service.create_refresh_token(subject=str(user.id))
+    stored_row = RefreshToken(
+        id=uuid.uuid4(),
+        user_id=user.id,
+        tenant_id=None,
+        token_hash=service._hash_token(refresh_value),
+        expires_at=datetime.now(UTC) + timedelta(days=1),
+        revoked_at=None,
+    )
+    with (
+        patch("app.modules.auth.service.RefreshTokenRepository") as token_repo_cls,
+        patch("app.modules.auth.service.UserRepository") as user_repo_cls,
+    ):
+        token_repo_cls.return_value.get_active_by_hash = AsyncMock(return_value=stored_row)
+        user_repo_cls.return_value.get_by_id = AsyncMock(return_value=user)
+
+        with pytest.raises(RefreshTokenInvalidError):
+            await service.refresh(AsyncMock(), refresh_token=refresh_value)
+
+
+@pytest.mark.asyncio
 async def test_refresh_preserves_tenant_context_and_rotates_token() -> None:
     user = _make_user()
     tenant_id = uuid.uuid4()

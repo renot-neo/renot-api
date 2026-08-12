@@ -160,6 +160,34 @@ async def test_send_photo_sends_photo_field_and_caption() -> None:
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_send_photo_includes_all_optional_fields_when_given() -> None:
+    """`_send_media` (shared by send_photo/send_document/send_video) has an
+
+    `if x is not None` branch per optional field - `caption` alone is
+    covered by the test above, this covers the other three in one call.
+    """
+    route = respx.post(f"https://api.telegram.org/bot{TOKEN}/sendPhoto").mock(
+        return_value=httpx.Response(200, json={"ok": True, "result": {"message_id": 49}})
+    )
+    reply_markup = {"inline_keyboard": [[{"text": "Open", "url": "https://example.com"}]]}
+
+    await send_photo(
+        TOKEN,
+        chat_id=123,
+        photo="https://example.com/pic.jpg",
+        message_thread_id=7,
+        parse_mode="HTML",
+        reply_markup=reply_markup,
+    )
+
+    sent_body = route.calls.last.request.content
+    assert b'"message_thread_id":7' in sent_body
+    assert b'"parse_mode":"HTML"' in sent_body
+    assert b'"reply_markup"' in sent_body
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_send_document_sends_document_field() -> None:
     route = respx.post(f"https://api.telegram.org/bot{TOKEN}/sendDocument").mock(
         return_value=httpx.Response(200, json={"ok": True, "result": {"message_id": 46}})
@@ -201,6 +229,19 @@ async def test_send_poll_returns_result_on_success() -> None:
     assert b'"options":["Yes","No"]' in sent_body
     assert b'"is_anonymous":true' in sent_body
     assert b'"allows_multiple_answers":false' in sent_body
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_send_poll_includes_message_thread_id_when_given() -> None:
+    route = respx.post(f"https://api.telegram.org/bot{TOKEN}/sendPoll").mock(
+        return_value=httpx.Response(200, json={"ok": True, "result": {"message_id": 50}})
+    )
+
+    await send_poll(TOKEN, chat_id=123, question="Q?", options=["A", "B"], message_thread_id=7)
+
+    sent_body = route.calls.last.request.content
+    assert b'"message_thread_id":7' in sent_body
 
 
 @pytest.mark.asyncio

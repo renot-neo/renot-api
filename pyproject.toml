@@ -43,6 +43,25 @@ disallow_untyped_defs = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+filterwarnings = [
+    # Two known, harmless DeprecationWarnings from inside `passlib` itself
+    # (not our code - confirmed by grepping app/ for both symbols and
+    # reading passlib's own source). passlib 1.7.4 is both the installed
+    # AND the latest version on PyPI (last released 2020, effectively
+    # unmaintained) - there is no newer release that fixes either one, so
+    # these can't be resolved by upgrading. Narrowly scoped to the exact
+    # message + source module (not a blanket DeprecationWarning ignore) so
+    # an unrelated new warning still surfaces normally.
+    # 1. passlib/utils/__init__.py: imports stdlib `crypt` as an optional
+    #    fallback backend - `crypt` itself is what's deprecated (PEP 594),
+    #    passlib just imports it unconditionally at module load time.
+    "ignore:'crypt' is deprecated and slated for removal in Python 3\\.13:DeprecationWarning:passlib\\.utils",
+    # 2. passlib/handlers/argon2.py: reads `argon2_cffi.__version__` for a
+    #    debug log line - argon2-cffi (currently the latest, 25.1.0) has
+    #    deprecated that attribute in favor of `importlib.metadata`, but
+    #    passlib was never updated to follow (no newer passlib exists).
+    "ignore:Accessing argon2\\.__version__ is deprecated.*:DeprecationWarning:passlib\\.handlers\\.argon2",
+]
 
 [tool.coverage.run]
 source = ["app"]

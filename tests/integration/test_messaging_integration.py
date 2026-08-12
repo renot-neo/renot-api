@@ -240,6 +240,12 @@ async def test_message_template_crud(
     assert create_resp.status_code == 201
     template_id = create_resp.json()["data"]["id"]
 
+    # Detail fetch success - the only other GET on this URL below only
+    # ever exercises the 404-after-delete branch.
+    detail_resp = await client_as_owner.get(f"/api/v1/message-templates/{template_id}")
+    assert detail_resp.status_code == 200
+    assert detail_resp.json()["data"]["name"] == "Welcome"
+
     list_resp = await client_as_owner.get("/api/v1/message-templates")
     assert list_resp.status_code == 200
     assert len(list_resp.json()["data"]["items"]) == 1
