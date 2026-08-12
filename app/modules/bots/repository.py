@@ -7,6 +7,13 @@ rows and filter by the `tenant_id` context. `get_active_by_telegram_bot_id`
 deliberately queries across tenants - marked explicitly `# tenant-agnostic`
 because a Telegram bot's uniqueness (a single BotFather token can only be
 registered once platform-wide) isn't a per-tenant concept.
+
+`BotRepository` has no `with_deleted()` variant - no caller anywhere in the
+codebase needs an audit/admin path that looks past the soft-delete (same
+reasoning as `OrganizationRepository`, see its module docstring).
+`BotAssignmentRepository.get_with_deleted` is a separate, real exception:
+`service.assign_bot` uses it to find and reactivate a soft-deleted
+assignment row instead of inserting a duplicate.
 """
 
 from __future__ import annotations
@@ -64,12 +71,6 @@ class BotRepository:
         stmt = select(Bot).where(
             Bot.id == bot_id, Bot.tenant_id == tenant_id, Bot.deleted_at.is_(None)
         )
-        result = await self._session.execute(stmt)
-        return result.scalar_one_or_none()
-
-    async def get_with_deleted(self, *, tenant_id: uuid.UUID, bot_id: uuid.UUID) -> Bot | None:
-        """Explicitly includes soft-deleted rows - for audit/admin use cases."""
-        stmt = select(Bot).where(Bot.id == bot_id, Bot.tenant_id == tenant_id)
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
