@@ -199,6 +199,7 @@ async def test_start_command_subscribes_when_webhook_enabled() -> None:
         assert subscribe.await_args.kwargs["chat_id"] == 111
         send.assert_awaited_once()
         assert "subscribed" in send.await_args.kwargs["text"].lower()
+        assert send.await_args.kwargs["parse_mode"] == "HTML"
 
 
 @pytest.mark.asyncio
@@ -314,6 +315,27 @@ async def test_start_command_resolves_plain_group_without_thread() -> None:
         assert subscribe.await_args.kwargs["type"] == DestinationType.GROUP
         assert subscribe.await_args.kwargs["thread_id"] is None
         assert subscribe.await_args.kwargs["chat_id"] == -100888
+
+
+@pytest.mark.asyncio
+async def test_start_command_escapes_bot_name_with_html_special_chars() -> None:
+    bot = _bot(webhook_enabled=True, name="A & B <Bot>")
+    subscription = _subscription(status=SubscriptionStatus.ACTIVE)
+    with (
+        patch("app.modules.webhooks.service.get_bot_for_webhook", AsyncMock(return_value=bot)),
+        patch(
+            "app.modules.webhooks.service.subscribe_via_start",
+            AsyncMock(return_value=(object(), subscription)),
+        ),
+        patch("app.modules.webhooks.service.send_message", AsyncMock()) as send,
+    ):
+        await service.handle_telegram_update(
+            AsyncMock(), bot_id=bot.id, secret_token=_WEBHOOK_SECRET, update=_update("/start")
+        )
+
+        text = send.await_args.kwargs["text"]
+        assert "A &amp; B &lt;Bot&gt;" in text
+        assert "<Bot>" not in text
 
 
 @pytest.mark.asyncio

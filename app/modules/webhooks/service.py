@@ -30,6 +30,7 @@ control (the Telegram API's network).
 
 from __future__ import annotations
 
+import html
 import uuid
 
 import structlog
@@ -52,11 +53,26 @@ logger = structlog.get_logger(__name__)
 _KNOWN_COMMANDS = {"start", "stop", "status", "help"}
 
 _HELP_TEXT_TEMPLATE = "Need help? See the setup guide: {help_url}"
-_REGISTRATION_CLOSED_TEXT = "Registration is currently closed for this bot."
-_SUBSCRIBED_TEXT = "You're subscribed! You'll now receive messages from this bot."
-_BLOCKED_TEXT = "You have been blocked from this bot by an administrator."
-_UNSUBSCRIBED_TEXT = "You've been unsubscribed. Send /start to subscribe again."
-_NOT_SUBSCRIBED_TEXT = "You weren't subscribed to this bot."
+_SUBSCRIBED_TEMPLATE = (
+    "✅ You're subscribed to {bot_name}! You'll receive notifications here from now on.\n\n"
+    "Send /status to check your subscription, or /stop to unsubscribe anytime."
+)
+_BLOCKED_TEMPLATE = (
+    "🚫 You've been blocked from {bot_name} by an administrator. "
+    "Contact them if you think this is a mistake."
+)
+_REGISTRATION_CLOSED_TEMPLATE = (
+    "🔒 Registration for {bot_name} is currently closed. "
+    "Please contact the administrator if you believe this is unexpected."
+)
+_UNSUBSCRIBED_TEMPLATE = (
+    "👋 You've been unsubscribed from {bot_name}. You won't receive any more notifications here.\n\n"
+    "Send /start anytime if you'd like to subscribe again."
+)
+_NOT_SUBSCRIBED_TEMPLATE = (
+    "ℹ️ You weren't subscribed to {bot_name}, so there's nothing to unsubscribe from.\n\n"
+    "Send /start if you'd like to subscribe."
+)
 
 
 async def handle_telegram_update(
@@ -126,8 +142,10 @@ async def _handle_start(
 
     creating nothing.
     """
+    bot_name = html.escape(bot.name)
     if not bot.webhook_enabled:
-        await _reply(bot, chat_id=chat_id, thread_id=thread_id, text=_REGISTRATION_CLOSED_TEXT)
+        text = _REGISTRATION_CLOSED_TEMPLATE.format(bot_name=bot_name)
+        await _reply(bot, chat_id=chat_id, thread_id=thread_id, text=text)
         return
 
     _, subscription = await subscribe_via_start(
@@ -140,9 +158,11 @@ async def _handle_start(
         title=title,
     )
     if subscription.status == SubscriptionStatus.BLOCKED_BY_ADMIN:
-        await _reply(bot, chat_id=chat_id, thread_id=thread_id, text=_BLOCKED_TEXT)
+        text = _BLOCKED_TEMPLATE.format(bot_name=bot_name)
+        await _reply(bot, chat_id=chat_id, thread_id=thread_id, text=text)
         return
-    await _reply(bot, chat_id=chat_id, thread_id=thread_id, text=_SUBSCRIBED_TEXT)
+    text = _SUBSCRIBED_TEMPLATE.format(bot_name=bot_name)
+    await _reply(bot, chat_id=chat_id, thread_id=thread_id, text=text)
 
 
 async def _handle_stop(
@@ -152,7 +172,8 @@ async def _handle_stop(
     subscription = await unsubscribe_via_stop(
         session, tenant_id=bot.tenant_id, bot_id=bot.id, chat_id=chat_id, thread_id=thread_id
     )
-    text = _NOT_SUBSCRIBED_TEXT if subscription is None else _UNSUBSCRIBED_TEXT
+    template = _NOT_SUBSCRIBED_TEMPLATE if subscription is None else _UNSUBSCRIBED_TEMPLATE
+    text = template.format(bot_name=html.escape(bot.name))
     await _reply(bot, chat_id=chat_id, thread_id=thread_id, text=text)
 
 
@@ -176,7 +197,11 @@ async def _handle_help(*, bot: Bot, chat_id: int, thread_id: int | None) -> None
 async def _reply(bot: Bot, *, chat_id: int, thread_id: int | None, text: str) -> None:
     try:
         await send_message(
-            reveal_token(bot), chat_id=chat_id, text=text, message_thread_id=thread_id
+            reveal_token(bot),
+            chat_id=chat_id,
+            text=text,
+            message_thread_id=thread_id,
+            parse_mode="HTML",
         )
     except TelegramAPIError as exc:
         # A failed reply must not fail webhook processing (the DB state is
