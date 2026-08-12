@@ -17,3 +17,6 @@ htmlcov/
 
 # Private strategy/planning docs - never meant to reach the public repo.
 private/
+
+# Subagent-driven-development scratch workspace (ledgers, briefs, review packages).
+.superpowers/
