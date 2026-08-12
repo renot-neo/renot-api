@@ -5,15 +5,30 @@
   </picture>
 </p>
 
-[![CI](https://github.com/renot-neo/renot-api/actions/workflows/ci.yml/badge.svg)](https://github.com/renot-neo/renot-api/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<p align="center">
+  <a href="https://github.com/renot-neo/renot-api/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/renot-neo/renot-api/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/renot-neo/renot-api/releases"><img alt="Release" src="https://img.shields.io/github/v/release/renot-neo/renot-api"></a>
+  <a href="pyproject.toml"><img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-blue"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
+  <a href="CONTRIBUTING.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg"></a>
+</p>
 
-> **Status:** Pre-1.0 (`0.x`), following [SemVer](https://semver.org/) —
-> breaking changes may land in a minor release until `1.0.0`.
+<p align="center">
+  <strong>Status:</strong> Pre-1.0 (<code>0.x</code>), following <a href="https://semver.org/">SemVer</a> — breaking changes may land in a minor release until <code>1.0.0</code>.
+</p>
 
-A multi-tenant B2B SaaS platform for centralized Telegram bot management — register Telegram bots, manage subscriber destinations (chats/groups/channels), and send/schedule messages (text, media, polls) with delivery tracking, usage metering, and per-plan retention.
+Managing a dozen Telegram bots across a dozen teams shouldn't mean a dozen different scripts. **renot-api** gives your whole organization one API to register bots, manage every subscriber — chats, groups, channels — and send or schedule messages, with delivery tracking, usage metering, and retention built in from day one.
 
-## Quick example
+## ✨ Features
+
+- **Multi-tenant by design** — each organization's bots, destinations, and messages are fully isolated, with owner/admin/member roles (RBAC)
+- **Register & manage Telegram bots** — validated live against the real Telegram API on registration, webhook auto-configured
+- **Subscriber management** — personal chats, groups, group threads, and channels, with auto-subscribe the moment someone hits `/start`
+- **Send & schedule messages** — text, media, or polls, right now or queued for later, with per-destination delivery tracking and automatic retry
+- **Usage metering & retention** — every inbound/outbound event counted per plan, old data purged automatically per organization's retention window
+- **Encrypted secrets at rest** — bot tokens and webhook secrets are Fernet-encrypted, never stored plaintext
+
+## ⚡ Quick example
 
 ```bash
 curl -X POST https://your-domain.example.com/api/v1/messages \
@@ -53,61 +68,14 @@ curl -X POST https://your-domain.example.com/api/v1/messages \
 
 See [docs/API_CONVENTIONS.md](docs/API_CONVENTIONS.md) for pagination, rate limits, the response envelope, and auth conventions — see the interactive docs (`/docs`, disabled in production) for full per-endpoint request/response schemas.
 
-## Tech stack
+## 🧰 Tech stack
 
 - **FastAPI** (async) + **Pydantic v2** for the HTTP API
 - **PostgreSQL** via **SQLAlchemy 2.0** (async) + **Alembic** for migrations
 - **Celery** + **Redis** for background work (message dispatch, webhook metering, retention purge) and rate limiting
 - **structlog** for structured JSON logging
 
-## Architecture
-
-This is a **Domain-Driven Modular Monolith**. Each domain lives under `app/modules/<name>/` as a self-contained unit:
-
-```
-app/modules/<name>/
-├── router.py       # HTTP endpoints — request in, service call, envelope out. No business logic.
-├── service.py      # Business logic — the only place business rules live.
-├── repository.py   # Data access — SQLAlchemy queries.
-├── model.py        # SQLAlchemy models.
-├── schema.py       # Pydantic request/response schemas.
-├── exceptions.py   # Domain-specific exceptions (subclass AppException).
-└── __init__.py     # The module's public interface — the ONLY thing other modules may import.
-```
-
-Modules: `auth`, `organizations`, `bots`, `destinations`, `messaging`, `billing`, `webhooks`.
-
-Cross-module communication always goes through a module's `__init__.py` interface — never `from app.modules.x.model import Y` across module boundaries. This keeps each module free to change its internals without breaking others, and keeps the dependency graph explicit.
-
-Cross-cutting infrastructure (DB session, JWT/permission dependencies, pagination, the response envelope, exception handling, middleware) lives in `app/core/`. Shared pure utilities (the Telegram HTTP client, Telegram-specific Pydantic types) live in `app/shared/`.
-
-```mermaid
-graph TD
-    core["app/core/<br/>(DB session, auth deps, pagination,<br/>response envelope, middleware)"]
-    auth[auth]
-    organizations[organizations]
-    bots[bots]
-    destinations[destinations]
-    messaging[messaging]
-    billing[billing]
-    webhooks[webhooks]
-
-    core --- auth
-    core --- organizations
-    core --- bots
-    core --- destinations
-    core --- messaging
-    core --- billing
-    core --- webhooks
-
-    organizations --> bots
-    bots --> destinations
-    bots --> messaging
-    messaging --> billing
-    webhooks --> bots
-```
-
-## Getting started
+## 🚀 Getting started
 
 ### 1. Configure environment
 
@@ -122,14 +90,12 @@ cp .env.example .env.development
 docker compose -f docker/docker-compose.yml up
 ```
 
-This also starts the FastAPI app itself (`app` service) and `celery-flower` (a Celery monitoring UI at `localhost:5555`, dev-only).
+This also starts the FastAPI app itself (`app` service) and `celery-flower` (a Celery monitoring UI at `localhost:5555`, dev-only). Postgres/Redis/Celery still need step 3 below to actually create the schema — nothing in `docker compose up` runs migrations for you.
 
-To run the app directly on the host instead (e.g. for a debugger), install dependencies and run migrations first:
+To run the app directly on the host instead (e.g. for a debugger), install dependencies first, then continue from step 3:
 
 ```bash
 pip install -r requirements-dev.txt
-alembic upgrade head
-uvicorn app.main:app --reload
 ```
 
 ### 3. Run database migrations
@@ -144,6 +110,8 @@ New migration:
 alembic revision --autogenerate -m "description"
 ```
 
+Then, if running the app on the host: `uvicorn app.main:app --reload`.
+
 ### 4. Explore the API
 
 Once running locally, interactive API docs are available at
@@ -154,40 +122,9 @@ reachable in every environment by design. See
 [docs/API_CONVENTIONS.md](docs/API_CONVENTIONS.md) for the API reference
 that stays available regardless of environment.
 
-## Running tests
+## 📚 Documentation
 
-Tests are split into three tiers:
-
-| Tier        | Location               | What it covers                                                                                                    | Needs Docker? |
-| ----------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------- |
-| Unit        | `tests/unit/`        | Pure logic, repositories/external calls mocked                                                                    | No            |
-| Integration | `tests/integration/` | Router → service → real Postgres (via`testcontainers`), external calls (Telegram API, Celery dispatch) mocked | Yes           |
-| Feature     | `tests/feature/`     | Full end-to-end user journeys over real HTTP                                                                      | Yes           |
-
-```bash
-pytest tests/unit                    # fast, no Docker required
-pytest tests/integration tests/feature  # spins up a Postgres container automatically
-pytest --cov=app --cov-fail-under=95    # full suite with coverage gate (matches CI)
-```
-
-## Linting & type checking
-
-```bash
-ruff check .
-black --check .
-isort --check-only .
-mypy app
-```
-
-Or install the pre-commit hooks to run these automatically:
-
-```bash
-pre-commit install
-```
-
-## Documentation
-
-- [CONTRIBUTING.md](CONTRIBUTING.md) — dev setup, testing, PR flow
+- [CONTRIBUTING.md](CONTRIBUTING.md) — dev setup, architecture, testing, linting, PR flow
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - [SECURITY.md](SECURITY.md) — vulnerability disclosure
 - [SUPPORT.md](SUPPORT.md) — how to ask for help
@@ -195,22 +132,3 @@ pre-commit install
 - [docs/API_VERSIONING.md](docs/API_VERSIONING.md) — backward-compatibility policy
 - [docs/API_CONVENTIONS.md](docs/API_CONVENTIONS.md) — pagination, rate limits, error format, auth
 - [LICENSE](LICENSE) — MIT
-
-## Project structure
-
-```
-app/
-├── core/           # Cross-cutting infrastructure (config, DB, auth deps, middleware, response envelope)
-├── i18n/           # Error message translations (en/id)
-├── modules/        # Domain modules (see Architecture above)
-├── shared/         # Pure cross-module utilities (Telegram HTTP client, Telegram types)
-├── worker/         # Celery worker entrypoint
-└── main.py         # FastAPI app entrypoint
-alembic/            # Database migrations
-docker/             # Dockerfile + docker-compose for local dev
-tests/
-├── unit/
-├── integration/
-├── feature/
-└── support/        # Shared fixtures (real Postgres via testcontainers)
-```

@@ -17,11 +17,79 @@ docker compose -f docker/docker-compose.yml up   # Postgres, Redis, Celery, the 
 alembic upgrade head
 ```
 
-See [README.md](README.md#getting-started) for the full setup walkthrough
-and [README.md](README.md#architecture) for the module-layout explanation
-— every domain module (`auth`, `organizations`, `bots`, `destinations`,
+See [README.md](README.md#getting-started) for the full setup walkthrough.
+Every domain module (`auth`, `organizations`, `bots`, `destinations`,
 `messaging`, `billing`, `webhooks`) follows the same
-`router.py`/`service.py`/`repository.py`/`model.py`/`schema.py` shape.
+`router.py`/`service.py`/`repository.py`/`model.py`/`schema.py` shape —
+see "Architecture" below for the full picture.
+
+## Architecture
+
+Top-level layout:
+
+```
+app/
+├── core/           # Cross-cutting infrastructure (config, DB, auth deps, middleware, response envelope)
+├── i18n/           # Error message translations (en/id)
+├── modules/        # Domain modules (see below)
+├── shared/         # Pure cross-module utilities (Telegram HTTP client, Telegram types)
+├── worker/         # Celery worker entrypoint
+└── main.py         # FastAPI app entrypoint
+alembic/            # Database migrations
+docker/             # Dockerfile + docker-compose for local dev
+tests/
+├── unit/
+├── integration/
+├── feature/
+└── support/        # Shared fixtures (real Postgres via testcontainers)
+```
+
+This is a **Domain-Driven Modular Monolith**. Each domain lives under
+`app/modules/<name>/` as a self-contained unit:
+
+```
+app/modules/<name>/
+├── router.py       # HTTP endpoints — request in, service call, envelope out. No business logic.
+├── service.py      # Business logic — the only place business rules live.
+├── repository.py   # Data access — SQLAlchemy queries.
+├── model.py        # SQLAlchemy models.
+├── schema.py       # Pydantic request/response schemas.
+├── exceptions.py   # Domain-specific exceptions (subclass AppException).
+└── __init__.py     # The module's public interface — the ONLY thing other modules may import.
+```
+
+Modules: `auth`, `organizations`, `bots`, `destinations`, `messaging`, `billing`, `webhooks`.
+
+Cross-module communication always goes through a module's `__init__.py`
+interface — never `from app.modules.x.model import Y` across module
+boundaries. This keeps each module free to change its internals without
+breaking others, and keeps the dependency graph explicit.
+
+```mermaid
+graph TD
+    core["app/core/<br/>(DB session, auth deps, pagination,<br/>response envelope, middleware)"]
+    auth[auth]
+    organizations[organizations]
+    bots[bots]
+    destinations[destinations]
+    messaging[messaging]
+    billing[billing]
+    webhooks[webhooks]
+
+    core --- auth
+    core --- organizations
+    core --- bots
+    core --- destinations
+    core --- messaging
+    core --- billing
+    core --- webhooks
+
+    organizations --> bots
+    bots --> destinations
+    bots --> messaging
+    messaging --> billing
+    webhooks --> bots
+```
 
 ## Soft-delete convention
 
