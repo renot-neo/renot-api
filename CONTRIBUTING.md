@@ -23,6 +23,29 @@ and [README.md](README.md#architecture) for the module-layout explanation
 `messaging`, `billing`, `webhooks`) follows the same
 `router.py`/`service.py`/`repository.py`/`model.py`/`schema.py` shape.
 
+## Soft-delete convention
+
+Every tenant-scoped entity (anything built on `TenantScopedBase`, which adds
+a `deleted_at` timestamp) is soft-deleted, never hard-deleted, and its
+`repository.py` module docstring must say so explicitly:
+
+- State that the default lookup methods (`get_active`/`list_active`, or
+  equivalent) exclude soft-deleted rows.
+- State whether a `with_deleted()`/`get_with_deleted()` variant exists for
+  looking past the soft-delete. Only add one when a real caller needs it
+  (e.g. `BotAssignmentRepository.get_with_deleted` exists because
+  `service.assign_bot` reactivates a soft-deleted assignment instead of
+  inserting a duplicate row) — otherwise say explicitly that no such variant
+  exists, so the absence reads as a deliberate decision the next contributor
+  can trust, not something nobody got around to.
+
+Entities that opt out of the pattern entirely (e.g. `users`,
+`organization_memberships` — hard-deleted or never deleted) should say so
+just as explicitly in their own module docstring, rather than leaving it
+unstated. See `app/modules/bots/repository.py`,
+`app/modules/organizations/repository.py`, and
+`app/modules/auth/repository.py` for worked examples of both cases.
+
 ## Testing
 
 Tests are split into three tiers — pick the lowest tier that can prove your
