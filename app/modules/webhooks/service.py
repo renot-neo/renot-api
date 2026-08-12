@@ -1,8 +1,8 @@
 """Business logic for the `webhooks` module.
 
-Scope: processing inbound Telegram webhooks, including the `/start`/`/stop`
-side of the subscribe flow that Telegram triggers (the manual dashboard
-path already lives in `modules/destinations`).
+Scope: processing inbound Telegram webhooks, including the `/start`, `/stop`,
+`/status`, `/help`, `/about` side of the subscribe flow that Telegram triggers
+(the manual dashboard path already lives in `modules/destinations`).
 
 This is the layer the router calls into - the only place business logic
 belongs.
@@ -14,7 +14,7 @@ belongs.
 2. Validate `secret_token` (the `X-Telegram-Bot-Api-Secret-Token` header)
    against `Bot.webhook_secret` - raises `WebhookSecretInvalidError` on a mismatch.
 3. If the update isn't a text `message`, or isn't a recognized command
-   (`/start`, `/stop`, `/status`, `/help`), or its chat is a `channel`
+   (`/start`, `/stop`, `/status`, `/help`, `/about`), or its chat is a `channel`
    (channel posts have no user command flow - channels are registered
    manually via the dashboard instead), it's simply ignored - nothing is
    forwarded anywhere except for the core commands.
@@ -51,7 +51,7 @@ from app.shared.telegram_types import TelegramMessage, TelegramUpdate
 
 logger = structlog.get_logger(__name__)
 
-_KNOWN_COMMANDS = {"start", "stop", "status", "help"}
+_KNOWN_COMMANDS = {"start", "stop", "status", "help", "about"}
 
 _HELP_TEXT_TEMPLATE = (
     "👋 Here's what {bot_name} can do:\n\n"
@@ -61,6 +61,11 @@ _HELP_TEXT_TEMPLATE = (
     "/about – Learn more about this bot\n"
     "/help – Show this message\n\n"
     "Need more help? See the setup guide: {help_url}"
+)
+_ABOUT_TEXT_TEMPLATE = (
+    "ℹ️ About {bot_name}\n\n"
+    "This bot sends you notifications via Renot (@{bot_username}).\n\n"
+    "Use /help to see available commands, or /status to check your subscription."
 )
 _SUBSCRIBED_TEMPLATE = (
     "✅ You're subscribed to {bot_name}! You'll receive notifications here from now on.\n\n"
@@ -142,6 +147,8 @@ async def handle_telegram_update(
         await _handle_status(session, bot=bot, chat_id=chat_id, thread_id=thread_id)
     elif command == "help":
         await _handle_help(bot=bot, chat_id=chat_id, thread_id=thread_id)
+    elif command == "about":
+        await _handle_about(bot=bot, chat_id=chat_id, thread_id=thread_id)
 
     return bot.tenant_id
 
@@ -217,6 +224,13 @@ async def _handle_status(
 async def _handle_help(*, bot: Bot, chat_id: int, thread_id: int | None) -> None:
     text = _HELP_TEXT_TEMPLATE.format(
         bot_name=html.escape(bot.name), help_url=settings.telegram.help_url
+    )
+    await _reply(bot, chat_id=chat_id, thread_id=thread_id, text=text)
+
+
+async def _handle_about(*, bot: Bot, chat_id: int, thread_id: int | None) -> None:
+    text = _ABOUT_TEXT_TEMPLATE.format(
+        bot_name=html.escape(bot.name), bot_username=html.escape(bot.username)
     )
     await _reply(bot, chat_id=chat_id, thread_id=thread_id, text=text)
 

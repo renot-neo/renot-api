@@ -467,6 +467,40 @@ async def test_help_command_lists_commands_and_help_url() -> None:
 
 
 @pytest.mark.asyncio
+async def test_about_command_replies_with_name_and_username() -> None:
+    bot = _bot(name="My Bot", username="mybot")
+    with (
+        patch("app.modules.webhooks.service.get_bot_for_webhook", AsyncMock(return_value=bot)),
+        patch("app.modules.webhooks.service.send_message", AsyncMock()) as send,
+    ):
+        await service.handle_telegram_update(
+            AsyncMock(), bot_id=bot.id, secret_token=_WEBHOOK_SECRET, update=_update("/about")
+        )
+
+        text = send.await_args.kwargs["text"]
+        assert "My Bot" in text
+        assert "@mybot" in text
+        assert "Renot" in text
+        assert send.await_args.kwargs["parse_mode"] == "HTML"
+
+
+@pytest.mark.asyncio
+async def test_about_command_escapes_html_special_chars() -> None:
+    bot = _bot(name="A & B <Bot>", username="my_bot")
+    with (
+        patch("app.modules.webhooks.service.get_bot_for_webhook", AsyncMock(return_value=bot)),
+        patch("app.modules.webhooks.service.send_message", AsyncMock()) as send,
+    ):
+        await service.handle_telegram_update(
+            AsyncMock(), bot_id=bot.id, secret_token=_WEBHOOK_SECRET, update=_update("/about")
+        )
+
+        text = send.await_args.kwargs["text"]
+        assert "A &amp; B &lt;Bot&gt;" in text
+        assert "<Bot>" not in text
+
+
+@pytest.mark.asyncio
 async def test_reply_send_failure_does_not_raise() -> None:
     bot = _bot()
     with (
