@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.5.0](https://github.com/renot-neo/renot-api/compare/v0.4.1...v0.5.0) (2026-08-12)
+
+
+### Features
+
+* **destinations:** add get_subscription_status read-only lookup ([26e6260](https://github.com/renot-neo/renot-api/commit/26e6260e0be15d8eb4767b807e807874d39c84d3))
+* **webhooks:** add /about command ([2a70d39](https://github.com/renot-neo/renot-api/commit/2a70d39078bd1ef5e3b9319b04ed572c83978e8b))
+* **webhooks:** humanize /start and /stop replies, switch to parse_mode=HTML ([92a3860](https://github.com/renot-neo/renot-api/commit/92a3860dc84b05329db74be5ada56ecb1a8ff3c0))
+* **webhooks:** humanize /status with subscription state + tap-to-copy IDs ([aa0cfd6](https://github.com/renot-neo/renot-api/commit/aa0cfd636126f1579751fba8c81597530e1e1307))
+* **webhooks:** list all commands inline in /help reply ([cd3cf17](https://github.com/renot-neo/renot-api/commit/cd3cf173e1f4d2a9f41776103ff9a5cbda22e6a9))
+
+
+### Bug Fixes
+
+* resolve final-review findings (ruff E501, stale command-list docs) ([84bb2d6](https://github.com/renot-neo/renot-api/commit/84bb2d612916858a982fa7b7b28b00e51dc1ca81))
+
+
+### Documentation
+
+* document soft-delete-docstring convention in CONTRIBUTING.md ([9ea2ed7](https://github.com/renot-neo/renot-api/commit/9ea2ed77773a768646c7caeedbb860071bb1a3f2))
+* trim README to an adopter-focused pitch, move architecture to CONTRIBUTING.md ([f87674f](https://github.com/renot-neo/renot-api/commit/f87674f1f2b36d93b448969b03ece1942527b56a))
+
 ## [0.4.1](https://github.com/renot-neo/renot-api/compare/v0.4.0...v0.4.1) (2026-08-11)
 
 
