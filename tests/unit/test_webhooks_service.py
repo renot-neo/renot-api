@@ -448,7 +448,7 @@ async def test_status_command_header_reflects_subscription_state(
 
 
 @pytest.mark.asyncio
-async def test_help_command_replies_with_help_url() -> None:
+async def test_help_command_lists_commands_and_help_url() -> None:
     bot = _bot()
     with (
         patch("app.modules.webhooks.service.get_bot_for_webhook", AsyncMock(return_value=bot)),
@@ -458,7 +458,12 @@ async def test_help_command_replies_with_help_url() -> None:
             AsyncMock(), bot_id=bot.id, secret_token=_WEBHOOK_SECRET, update=_update("/help")
         )
 
-        assert "http" in send.await_args.kwargs["text"]
+        text = send.await_args.kwargs["text"]
+        assert "http" in text
+        assert "/start" in text
+        assert "/stop" in text
+        assert "/status" in text
+        assert "/about" in text
 
 
 @pytest.mark.asyncio

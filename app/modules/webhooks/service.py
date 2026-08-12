@@ -53,7 +53,15 @@ logger = structlog.get_logger(__name__)
 
 _KNOWN_COMMANDS = {"start", "stop", "status", "help"}
 
-_HELP_TEXT_TEMPLATE = "Need help? See the setup guide: {help_url}"
+_HELP_TEXT_TEMPLATE = (
+    "👋 Here's what {bot_name} can do:\n\n"
+    "/start – Subscribe this chat to receive notifications\n"
+    "/stop – Unsubscribe from notifications\n"
+    "/status – Check your subscription status and this chat's IDs\n"
+    "/about – Learn more about this bot\n"
+    "/help – Show this message\n\n"
+    "Need more help? See the setup guide: {help_url}"
+)
 _SUBSCRIBED_TEMPLATE = (
     "✅ You're subscribed to {bot_name}! You'll receive notifications here from now on.\n\n"
     "Send /status to check your subscription, or /stop to unsubscribe anytime."
@@ -207,7 +215,9 @@ async def _handle_status(
 
 
 async def _handle_help(*, bot: Bot, chat_id: int, thread_id: int | None) -> None:
-    text = _HELP_TEXT_TEMPLATE.format(help_url=settings.telegram.help_url)
+    text = _HELP_TEXT_TEMPLATE.format(
+        bot_name=html.escape(bot.name), help_url=settings.telegram.help_url
+    )
     await _reply(bot, chat_id=chat_id, thread_id=thread_id, text=text)
 
 
