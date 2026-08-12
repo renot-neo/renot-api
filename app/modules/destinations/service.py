@@ -287,6 +287,31 @@ async def is_actively_subscribed(
     return subscription is not None and subscription.status == SubscriptionStatus.ACTIVE
 
 
+async def get_subscription_status(
+    session: AsyncSession,
+    *,
+    tenant_id: uuid.UUID,
+    bot_id: uuid.UUID,
+    chat_id: int,
+    thread_id: int | None,
+) -> SubscriptionStatus | None:
+    """Read-only lookup for `/status` (used by `modules/webhooks`) - `None`
+
+    means this chat has never `/start`ed this bot (no `Destination` exists
+    yet for it), as distinct from an existing-but-inactive subscription
+    (`unsubscribed`/`blocked_by_admin`), which returns that actual status.
+    """
+    destination = await DestinationRepository(session).get_active_by_chat(
+        tenant_id=tenant_id, chat_id=chat_id, thread_id=thread_id
+    )
+    if destination is None:
+        return None
+    subscription = await SubscriptionRepository(session).get_active(
+        tenant_id=tenant_id, bot_id=bot_id, destination_id=destination.id
+    )
+    return subscription.status if subscription is not None else None
+
+
 async def unsubscribe_via_stop(
     session: AsyncSession,
     *,

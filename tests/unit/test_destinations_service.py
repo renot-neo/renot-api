@@ -497,3 +497,58 @@ async def test_unsubscribe_via_stop_sets_status_unsubscribed() -> None:
 
         assert result is subscription
         assert result.status == SubscriptionStatus.UNSUBSCRIBED
+
+
+@pytest.mark.asyncio
+async def test_get_subscription_status_returns_none_when_destination_missing() -> None:
+    with patch("app.modules.destinations.service.DestinationRepository") as repo_cls:
+        repo_cls.return_value.get_active_by_chat = AsyncMock(return_value=None)
+
+        result = await service.get_subscription_status(
+            AsyncMock(), tenant_id=uuid.uuid4(), bot_id=uuid.uuid4(), chat_id=123, thread_id=None
+        )
+
+        assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_subscription_status_returns_none_when_subscription_missing() -> None:
+    destination = _destination()
+    with (
+        patch("app.modules.destinations.service.DestinationRepository") as dest_repo_cls,
+        patch("app.modules.destinations.service.SubscriptionRepository") as sub_repo_cls,
+    ):
+        dest_repo_cls.return_value.get_active_by_chat = AsyncMock(return_value=destination)
+        sub_repo_cls.return_value.get_active = AsyncMock(return_value=None)
+
+        result = await service.get_subscription_status(
+            AsyncMock(), tenant_id=uuid.uuid4(), bot_id=uuid.uuid4(), chat_id=123, thread_id=None
+        )
+
+        assert result is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "status",
+    [
+        SubscriptionStatus.ACTIVE,
+        SubscriptionStatus.UNSUBSCRIBED,
+        SubscriptionStatus.BLOCKED_BY_ADMIN,
+    ],
+)
+async def test_get_subscription_status_returns_actual_status(status: SubscriptionStatus) -> None:
+    destination = _destination()
+    subscription = _subscription(destination_id=destination.id, status=status)
+    with (
+        patch("app.modules.destinations.service.DestinationRepository") as dest_repo_cls,
+        patch("app.modules.destinations.service.SubscriptionRepository") as sub_repo_cls,
+    ):
+        dest_repo_cls.return_value.get_active_by_chat = AsyncMock(return_value=destination)
+        sub_repo_cls.return_value.get_active = AsyncMock(return_value=subscription)
+
+        result = await service.get_subscription_status(
+            AsyncMock(), tenant_id=uuid.uuid4(), bot_id=uuid.uuid4(), chat_id=123, thread_id=None
+        )
+
+        assert result == status

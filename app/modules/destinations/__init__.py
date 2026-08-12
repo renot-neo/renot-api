@@ -11,6 +11,8 @@ which processes inbound `/start`/`/stop` commands from Telegram.
 `is_actively_subscribed` is exposed for `modules/messaging`, which needs to
 validate that each message's destination is actively subscribed to the
 relevant bot.
+`get_subscription_status` is exposed for `modules/webhooks`, which needs it to
+report subscription state in `/status` replies.
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from app.modules.destinations.model import (
 )
 from app.modules.destinations.service import (
     get_destination,
+    get_subscription_status,
     is_actively_subscribed,
     list_destinations_for_bot,
     subscribe_via_start,
@@ -31,6 +34,7 @@ from app.modules.destinations.service import (
 
 __all__ = [
     "get_destination",
+    "get_subscription_status",
     "is_actively_subscribed",
     "list_destinations_for_bot",
     "subscribe_via_start",
