@@ -377,6 +377,10 @@ async def test_status_command_replies_with_chat_and_thread_id() -> None:
     bot = _bot()
     with (
         patch("app.modules.webhooks.service.get_bot_for_webhook", AsyncMock(return_value=bot)),
+        patch(
+            "app.modules.webhooks.service.get_subscription_status",
+            AsyncMock(return_value=SubscriptionStatus.ACTIVE),
+        ),
         patch("app.modules.webhooks.service.send_message", AsyncMock()) as send,
     ):
         await service.handle_telegram_update(
@@ -389,8 +393,58 @@ async def test_status_command_replies_with_chat_and_thread_id() -> None:
         )
 
         text = send.await_args.kwargs["text"]
-        assert "chat_id: -100999" in text
-        assert "thread_id: 5" in text
+        assert "Chat ID: <code>-100999</code>" in text
+        assert "Thread ID: <code>5</code>" in text
+        assert send.await_args.kwargs["parse_mode"] == "HTML"
+
+
+@pytest.mark.asyncio
+async def test_status_command_omits_thread_id_line_when_none() -> None:
+    bot = _bot()
+    with (
+        patch("app.modules.webhooks.service.get_bot_for_webhook", AsyncMock(return_value=bot)),
+        patch(
+            "app.modules.webhooks.service.get_subscription_status",
+            AsyncMock(return_value=SubscriptionStatus.ACTIVE),
+        ),
+        patch("app.modules.webhooks.service.send_message", AsyncMock()) as send,
+    ):
+        await service.handle_telegram_update(
+            AsyncMock(), bot_id=bot.id, secret_token=_WEBHOOK_SECRET, update=_update("/status")
+        )
+
+        text = send.await_args.kwargs["text"]
+        assert "Chat ID: <code>111</code>" in text
+        assert "Thread ID:" not in text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status", "expected_snippet"),
+    [
+        (SubscriptionStatus.ACTIVE, "actively subscribed"),
+        (SubscriptionStatus.UNSUBSCRIBED, "not currently subscribed"),
+        (SubscriptionStatus.BLOCKED_BY_ADMIN, "blocked"),
+        (None, "haven't subscribed"),
+    ],
+)
+async def test_status_command_header_reflects_subscription_state(
+    status: SubscriptionStatus | None, expected_snippet: str
+) -> None:
+    bot = _bot()
+    with (
+        patch("app.modules.webhooks.service.get_bot_for_webhook", AsyncMock(return_value=bot)),
+        patch(
+            "app.modules.webhooks.service.get_subscription_status",
+            AsyncMock(return_value=status),
+        ),
+        patch("app.modules.webhooks.service.send_message", AsyncMock()) as send,
+    ):
+        await service.handle_telegram_update(
+            AsyncMock(), bot_id=bot.id, secret_token=_WEBHOOK_SECRET, update=_update("/status")
+        )
+
+        assert expected_snippet in send.await_args.kwargs["text"].lower()
 
 
 @pytest.mark.asyncio

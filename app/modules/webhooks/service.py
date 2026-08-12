@@ -41,6 +41,7 @@ from app.modules.bots import Bot, get_bot_for_webhook, reveal_token, reveal_webh
 from app.modules.destinations import (
     DestinationType,
     SubscriptionStatus,
+    get_subscription_status,
     subscribe_via_start,
     unsubscribe_via_stop,
 )
@@ -73,6 +74,14 @@ _NOT_SUBSCRIBED_TEMPLATE = (
     "ℹ️ You weren't subscribed to {bot_name}, so there's nothing to unsubscribe from.\n\n"
     "Send /start if you'd like to subscribe."
 )
+_STATUS_HEADER_TEMPLATES: dict[SubscriptionStatus | None, str] = {
+    SubscriptionStatus.ACTIVE: "✅ You're actively subscribed to {bot_name}.",
+    SubscriptionStatus.UNSUBSCRIBED: (
+        "⏸️ You're not currently subscribed to {bot_name}. Send /start to subscribe."
+    ),
+    SubscriptionStatus.BLOCKED_BY_ADMIN: "🚫 You're blocked from {bot_name} by an administrator.",
+    None: "ℹ️ You haven't subscribed to {bot_name} yet. Send /start to get started.",
+}
 
 
 async def handle_telegram_update(
@@ -122,7 +131,7 @@ async def handle_telegram_update(
     elif command == "stop":
         await _handle_stop(session, bot=bot, chat_id=chat_id, thread_id=thread_id)
     elif command == "status":
-        await _handle_status(bot=bot, chat_id=chat_id, thread_id=thread_id)
+        await _handle_status(session, bot=bot, chat_id=chat_id, thread_id=thread_id)
     elif command == "help":
         await _handle_help(bot=bot, chat_id=chat_id, thread_id=thread_id)
 
@@ -177,15 +186,23 @@ async def _handle_stop(
     await _reply(bot, chat_id=chat_id, thread_id=thread_id, text=text)
 
 
-async def _handle_status(*, bot: Bot, chat_id: int, thread_id: int | None) -> None:
-    """`/status` shows chat_id/thread_id to make setup easier - mainly used
+async def _handle_status(
+    session: AsyncSession, *, bot: Bot, chat_id: int, thread_id: int | None
+) -> None:
+    """`/status` shows the current subscription state plus `chat_id`/
 
+    `thread_id` in tap-to-copy code formatting - the latter is mainly used
     by a user to copy a group/channel's `chat_id` for manual registration
     via the dashboard.
     """
-    lines = [f"chat_id: {chat_id}"]
+    status = await get_subscription_status(
+        session, tenant_id=bot.tenant_id, bot_id=bot.id, chat_id=chat_id, thread_id=thread_id
+    )
+    bot_name = html.escape(bot.name)
+    header = _STATUS_HEADER_TEMPLATES[status].format(bot_name=bot_name)
+    lines = [header, "", "📋 Chat details", "", f"Chat ID: <code>{chat_id}</code>"]
     if thread_id is not None:
-        lines.append(f"thread_id: {thread_id}")
+        lines.append(f"Thread ID: <code>{thread_id}</code>")
     await _reply(bot, chat_id=chat_id, thread_id=thread_id, text="\n".join(lines))
 
 
