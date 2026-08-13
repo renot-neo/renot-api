@@ -17,6 +17,10 @@ name: CD
 #   public actually pulls, so they're worth the multi-arch build's extra
 #   time. Regular main pushes stay amd64-only for fast iteration. See
 #   release-please.yml's own comment for why the tag chain needs a PAT.
+#   After a successful tagged push, it also notifies the private
+#   `renot-neo/renot-deploy` repo via `repository_dispatch` so
+#   staging/production deploys can pick up the new image — see that repo for
+#   everything past this point.
 #
 # `:latest` ONLY moves on a release tag (2026-08-12 - previously moved on
 # every main push, which meant "latest" could silently be ahead of, or
@@ -126,3 +130,15 @@ jobs:
           subject-name: ${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
+
+      - name: Notify renot-deploy of new release
+        # The public repo's CD responsibility stops here: tell the private
+        # renot-deploy repo a new tag exists. That repo (not this one)
+        # holds every credential and step needed to actually put it
+        # somewhere real — see renot-deploy's own deploy.yml.
+        env:
+          GH_TOKEN: ${{ secrets.DEPLOY_DISPATCH_TOKEN }}
+        run: |
+          gh api repos/renot-neo/renot-deploy/dispatches \
+            -f event_type=image-published \
+            -F "client_payload[tag]=${{ github.ref_name }}"
