@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/renot-neo/renot-api/compare/v0.5.0...v0.6.0) (2026-08-13)
+
+
+### Features
+
+* **cd:** notify renot-deploy on tagged release ([#12](https://github.com/renot-neo/renot-api/issues/12)) ([6b43460](https://github.com/renot-neo/renot-api/commit/6b4346007c83f2cf6ef15dd762c9b98a76af30b4))
+
 ## [0.5.0](https://github.com/renot-neo/renot-api/compare/v0.4.1...v0.5.0) (2026-08-12)
 
 
